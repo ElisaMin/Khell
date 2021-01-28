@@ -7,6 +7,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import me.heizi.kotlinx.shell.CommandResult.Companion.waitForResult
+import java.io.IOException
 import java.util.concurrent.Executors
 
 /**
@@ -55,12 +56,12 @@ class OneTimeExecutor(
                 .run(commandLines = commandLines,arrayOf("sh"))
                 .waitForResult()
         }
-
     }
 
     private val pool by lazy { Executors.newFixedThreadPool(4) }
-    private val dispatcher: CoroutineDispatcher by lazy { pool.asCoroutineDispatcher() }
+    private val dispatcher by lazy { pool.asCoroutineDispatcher() }
     private val scope by lazy { scope + dispatcher }
+    private val exceptionRegex by lazy { "Cannot run program \".+\": error=(\\d+), (.+)".toRegex() }
 
 //    @JvmName("run1")
 //    fun run(vararg commandLines:String, prefix: Array<String>) = run(commandLines, prefix)
@@ -78,7 +79,35 @@ class OneTimeExecutor(
         prefix:Array<String> = arrayOf("sh")
     ): Flow<ProcessingResults> {
         val flow = MutableSharedFlow<ProcessingResults>()
-        val process = Runtime.getRuntime().exec(prefix)
+        var _process:Process? = null
+        try {
+            _process = ProcessBuilder(*prefix).start()
+        }catch (e:IOException) {
+            if (e.message != null) {
+                when{
+                    e.message!!.matches(exceptionRegex) -> {
+                        scope.launch(dispatcher) {
+                            exceptionRegex.find(e.message!!)!!.groupValues.let {
+                                flow.emit(ProcessingResults.Error(it[2]))
+                                flow.emit(ProcessingResults.CODE(it[1].toInt()))
+                                runCatching { // 关闭各种流 //好像不用关 草 //  算了还是关吧 //算了懒得理了
+                                    _process?.destroy()
+                                }
+                                flow.emit(ProcessingResults.Closed)
+                            }
+                        }
+                        return flow
+                    }
+                }
+            }
+
+            throw IOException("未知错误",e)
+        }
+        val process = _process!!
+
+//        val process = ProcessBuilder()
+//                .command(*prefix)
+//                .start()
         val waitQueue = Array(3) {false}
 
         scope.launch(dispatcher) {

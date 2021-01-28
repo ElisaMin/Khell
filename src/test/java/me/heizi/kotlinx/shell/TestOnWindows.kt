@@ -14,6 +14,20 @@ import java.util.*
 import kotlin.system.exitProcess
 
 
+class Tester{
+    @Test
+    fun regexSplit() {
+        val regex = "Cannot run program \".+\": error=(\\d+), (.+)".toRegex()
+        "Cannot run program \"su\": error=13, Permission denied".let {
+            println(it.matches(regex))
+            println(it.split(regex)) // nothings
+            println(it.replace(regex,",")) //nothing still
+            regex.findAll(it).forEach {
+                println(it.groupValues)
+            }
+        }
+    }
+}
 
 
 //fun main() {
@@ -35,38 +49,38 @@ import kotlin.system.exitProcess
 //
 //}
 class TestOnWindows {
-    val runnable get() = oneTimeExecutor("echo pause","echo.","set /p a=",prefix = arrayOf("cmd"))
+//    val runnable get() = oneTimeExecutor("echo pause","echo.","set /p a=",prefix = arrayOf("cmd"))
 
-    val times get() = Date().time
+//    val times get() = Date().time
+//
+//    @Test
+//    fun waitingForResult() = runBlocking{
+//        var time = times
+//        fun time() {
+//            times.let {
+//                println(
+//                    it - time
+//                )
+//                time = it
+//            }
+//        }
 
-    @Test
-    fun waitingForResult() = runBlocking{
-        var time = times
-        fun time() {
-            times.let {
-                println(
-                    it - time
-                )
-                time = it
-            }
-        }
-
-        println("waiting")
-        time()
-        runnable.waitForResult().let {
-            println("got the result")
-            time()
-            println(it)
-        }
-        time()
-    }
-    @Test
-    fun runningWithResult() = runBlocking{
-        runnable.onCompletion {
-            println("done")
-        }.collect {
-            println(it)
-            cancel()
-        }
-    }
+//        println("waiting")
+//        time()
+//        runnable.waitForResult().let {
+//            println("got the result")
+//            time()
+////            println(it)
+//        }
+//        time()
+//    }
+//    @Test
+//    fun runningWithResult() = runBlocking{
+//        runnable.onCompletion {
+//            println("done")
+//        }.collect {
+//            println(it)
+//            cancel()
+//        }
+//    }
 }

@@ -1,13 +1,19 @@
 package me.heizi.kotlinx.shell
 
+import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import me.heizi.kotlinx.shell.OneTimeExecutor.Companion.su
 
 import org.junit.Test
 import org.junit.runner.RunWith
 
 import org.junit.Assert.*
 
+private const val TAG = "ExampleInstrumentedTest"
 /**
  * Instrumented test, which will execute on an Android device.
  *
@@ -20,5 +26,28 @@ class ExampleInstrumentedTest {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
         assertEquals("me.heizi.kotlinx.shell.test", appContext.packageName)
+    }
+    @Test
+    fun runOnRealEm(){
+        runBlocking {
+            Log.i(TAG, "runOnRealEm: on blocking")
+            launch {
+                delay(3000)
+                println("after 3 second")
+            }
+            launch {
+                when (val result = su("echo hello world").await()) {
+                    is CommandResult.Success -> {
+                        Log.i(TAG, "useAppContext: 已经su")
+                    }
+                    is CommandResult.Failed -> {
+                        Log.i(TAG, "runOnRealEm: ${result.processingMessage}")
+                        Log.i(TAG, "runOnRealEm: ${result.errorMessage}")
+                        Log.i(TAG, "runOnRealEm: ${result.code}")
+                        Log.i(TAG, "useAppContext: 失败")
+                    }
+                }
+            }
+        }
     }
 }
