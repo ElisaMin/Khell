@@ -1,5 +1,6 @@
 package me.heizi.kotlinx.shell
 
+import android.util.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
@@ -21,9 +22,12 @@ class OneTimeExecutor(
 ):LifecycleObserver {
 
     companion object {
+
+
         private var _instance:OneTimeExecutor? = null
         val instance get() = _instance!!
         fun getInstance(scope: CoroutineScope):OneTimeExecutor {
+            Log.i(TAG, "getInstance: called")
             if (_instance == null) {
                 _instance = OneTimeExecutor(scope)
             }
@@ -39,6 +43,7 @@ class OneTimeExecutor(
             vararg commandLines: String,
             dispatcher: CoroutineDispatcher = Dispatchers.IO
         ): Deferred<CommandResult> = async(dispatcher) {
+            Log.i(TAG, "su: ${commandLines.joinToString()}")
             getInstance(this)
                 .run(commandLines = commandLines,arrayOf("su"))
                 .waitForResult()
@@ -52,6 +57,7 @@ class OneTimeExecutor(
             vararg commandLines: String,
             dispatcher: CoroutineDispatcher = Dispatchers.IO
         ): Deferred<CommandResult> = async(dispatcher) {
+            Log.i(TAG, "sh: ${commandLines.joinToString()}")
             getInstance(this)
                 .run(commandLines = commandLines,arrayOf("sh"))
                 .waitForResult()
@@ -83,6 +89,7 @@ class OneTimeExecutor(
         try {
             _process = ProcessBuilder(*prefix).start()
         }catch (e:IOException) {
+            Log.w(TAG, "run: catch IO exception", e)
             if (e.message != null) {
                 when{
                     e.message!!.matches(exceptionRegex) -> {
@@ -100,7 +107,6 @@ class OneTimeExecutor(
                     }
                 }
             }
-
             throw IOException("未知错误",e)
         }
         val process = _process!!
@@ -114,6 +120,7 @@ class OneTimeExecutor(
             process.outputStream.writer().let {
                 for( i in commandLines) {
                     it.write(i)
+                    Log.i(TAG, "run: command{$i}")
                     it.write("\n")
                     it.flush()
                 }
@@ -125,12 +132,14 @@ class OneTimeExecutor(
         }
         scope.launch(dispatcher) {
             process.inputStream.bufferedReader().lineSequence().forEach {
+                Log.i(TAG, "run: message{$it}")
                 flow.emit(ProcessingResults.Message(it))
             }
             waitQueue[1] = true
         }
         scope.launch(dispatcher) {
             process.errorStream.bufferedReader().lineSequence().forEach {
+                Log.w(TAG, "run: error{$it}")
                 flow.emit(ProcessingResults.Error(it))
             }
             waitQueue[2] = true
