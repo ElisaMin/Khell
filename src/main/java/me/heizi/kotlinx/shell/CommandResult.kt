@@ -1,6 +1,5 @@
 package me.heizi.kotlinx.shell
 
-import android.util.Log
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
@@ -27,12 +26,12 @@ sealed class CommandResult {
                 when(it) {
                     is ProcessingResults.Message -> {
                         message.append(it.message)
-                        Log.i(TAG, "waitForResult: message{${it.message}}")
+//                        Log.i(TAG, "waitForResult: message{${it.message}}")
                         message.append("\n")
                     }
                     is ProcessingResults.Error -> {
                         error?.let { e ->
-                            Log.i(TAG, "waitForResult: error{${it.message}}")
+//                            Log.i(TAG, "waitForResult: error{${it.message}}")
                             e.append(it.message)
                             e.append("\n")
                         } ?: run {
@@ -40,7 +39,7 @@ sealed class CommandResult {
                         }
                     }
                     is ProcessingResults.CODE -> {
-                        Log.i(TAG, "waitForResult: code{${it.code}}")
+//                        Log.i(TAG, "waitForResult: code{${it.code}}")
                         result = if (it.code == SUCCESS) {
                             Success(message.toString())
                         } else {
