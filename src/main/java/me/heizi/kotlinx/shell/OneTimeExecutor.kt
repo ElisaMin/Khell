@@ -1,167 +1,119 @@
 package me.heizi.kotlinx.shell
 
+/**
+ * 单次执行 执行完毕后立即作废
+ */
+
 import android.util.Log
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleObserver
-import androidx.lifecycle.OnLifecycleEvent
 import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import me.heizi.kotlinx.shell.CommandResult.Companion.waitForResult
 import java.io.IOException
-import java.util.concurrent.Executors
+
 
 /**
- * 执行一些立即获取结果的指令 无需进入下一次的loop
- *
- * 观察生命周期的摧毁事件释放内存
- * @param scope such as like [ViewModel.getViewModelScope] or [Activity.getLifecyclerScpope]
+ * 用于匹配错误的Regex
  */
-class OneTimeExecutor(
-    scope: CoroutineScope
-):LifecycleObserver {
+private val exceptionRegex by lazy { "Cannot run program \".+\": error=(\\d+), (.+)".toRegex() }
 
-    companion object {
-
-
-        private var _instance:OneTimeExecutor? = null
-        val instance get() = _instance!!
-        fun getInstance(scope: CoroutineScope):OneTimeExecutor {
-            Log.i(TAG, "getInstance: called")
-            if (_instance == null) {
-                _instance = OneTimeExecutor(scope)
-            }
-            return _instance!!
-        }
-
-        /**
-         * 使用SU异步执行Shell[commandLines]
-         *
-         * @return [Deferred]
-         */
-        fun CoroutineScope.su(
-            vararg commandLines: String,
-            dispatcher: CoroutineDispatcher = Dispatchers.IO
-        ): Deferred<CommandResult> = async(dispatcher) {
-            Log.i(TAG, "su: ${commandLines.joinToString()}")
-            getInstance(this)
-                .run(commandLines = commandLines,arrayOf("su"))
-                .waitForResult()
-        }
-        /**
-         * 使用sh异步执行Shell[commandLines]
-         *
-         * @return [Deferred]
-         */
-        fun CoroutineScope.sh(
-            vararg commandLines: String,
-            dispatcher: CoroutineDispatcher = Dispatchers.IO
-        ): Deferred<CommandResult> = async(dispatcher) {
-            Log.i(TAG, "sh: ${commandLines.joinToString()}")
-            getInstance(this)
-                .run(commandLines = commandLines,arrayOf("sh"))
-                .waitForResult()
-        }
-    }
-
-    private val pool by lazy { Executors.newFixedThreadPool(4) }
-    private val dispatcher by lazy { pool.asCoroutineDispatcher() }
-    private val scope by lazy { scope + dispatcher }
-    private val exceptionRegex by lazy { "Cannot run program \".+\": error=(\\d+), (.+)".toRegex() }
-
-//    @JvmName("run1")
-//    fun run(vararg commandLines:String, prefix: Array<String>) = run(commandLines, prefix)
-
-    /**
-     *
-     *
-     * @param commandLines 所要丢给shell的指令
-     * @param prefix 决定了以哪种形式打开这个解释器
-     * @return
-     */
-    @Suppress( "BlockingMethodInNonBlockingContext")
-    fun run(
-        commandLines: Array<out String>,
-        prefix:Array<String> = arrayOf("sh")
-    ): Flow<ProcessingResults> {
-        val flow = MutableSharedFlow<ProcessingResults>()
-        var _process:Process? = null
-        try {
-            _process = ProcessBuilder(*prefix).start()
-        }catch (e:IOException) {
-            Log.w(TAG, "run: catch IO exception", e)
-            if (e.message != null) {
-                when{
-                    e.message!!.matches(exceptionRegex) -> {
-                        scope.launch(dispatcher) {
-                            exceptionRegex.find(e.message!!)!!.groupValues.let {
-                                flow.emit(ProcessingResults.Error(it[2]))
-                                flow.emit(ProcessingResults.CODE(it[1].toInt()))
-                                runCatching { // 关闭各种流 //好像不用关 草 //  算了还是关吧 //算了懒得理了
-                                    _process?.destroy()
-                                }
-                                flow.emit(ProcessingResults.Closed)
-                            }
-                        }
-                        return flow
-                    }
-                }
-            }
-            throw IOException("未知错误",e)
-        }
-        val process = _process!!
-
-//        val process = ProcessBuilder()
-//                .command(*prefix)
-//                .start()
-        val waitQueue = Array(3) {false}
-
-        scope.launch(dispatcher) {
-            process.outputStream.writer().let {
-                for( i in commandLines) {
-                    it.write(i)
-                    Log.i(TAG, "run: command{$i}")
-                    it.write("\n")
-                    it.flush()
-                }
-                process.outputStream.runCatching {
-                    close()
-                }
-                waitQueue[0] = true
-            }
-        }
-        scope.launch(dispatcher) {
-            process.inputStream.bufferedReader().lineSequence().forEach {
-                Log.i(TAG, "run: message{$it}")
-                flow.emit(ProcessingResults.Message(it))
-            }
-            waitQueue[1] = true
-        }
-        scope.launch(dispatcher) {
-            process.errorStream.bufferedReader().lineSequence().forEach {
-                Log.w(TAG, "run: error{$it}")
-                flow.emit(ProcessingResults.Error(it))
-            }
-            waitQueue[2] = true
-        }
-        scope.launch(dispatcher) {
-            //等待执行完成
-            while (waitQueue.contains(false)) delay(1)
-            flow.emit(ProcessingResults.CODE(process.waitFor()))
-            kotlin.runCatching {
-                process.inputStream.close()
-                process.errorStream.close()
-                process.destroy()
-            }
-            flow.emit(ProcessingResults.Closed)
-        }
-        return flow
-    }
-    @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-    private fun destroy() {
-        dispatcher.cancelChildren()
-        dispatcher.cancel()
-        pool.shutdown()
-    }
-
+/**
+ * 使用SU异步执行Shell[commandLines]
+ *
+ * @param dispatcher 至少有3个任务同时进行
+ * @return [Deferred]
+ */
+fun CoroutineScope.su(
+        vararg commandLines: String,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO
+): Deferred<CommandResult> = async(dispatcher) {
+    Log.i(TAG, "su: ${commandLines.joinToString()}")
+    shell(commandLines = commandLines,arrayOf("su"),dispatcher).waitForResult()
 }
+/**
+ *
+ *
+ * @param commandLines 所要丢给shell的指令
+ * @param prefix 决定了以哪种形式打开这个解释器
+ * @return
+ */
+@Suppress( "BlockingMethodInNonBlockingContext")
+fun CoroutineScope.shell(
+        commandLines: Array<out String>,
+        prefix:Array<String> = arrayOf("sh"),
+        dispatcher: CoroutineDispatcher = Default
+): Flow<ProcessingResults> {
+    Log.i(TAG, "run: called")
+
+    val flow = MutableSharedFlow<ProcessingResults>()
+
+    val process = try {
+        ProcessBuilder(*prefix).start()
+    }catch (e:IOException) {
+        Log.w(TAG, "run: catch IO exception", e)
+        if (e.message != null) {
+            when{
+                e.message!!.matches(exceptionRegex) -> {
+                    launch(dispatcher) {
+                        exceptionRegex.find(e.message!!)!!.groupValues.let {
+                            flow.emit(ProcessingResults.Error(it[2]))
+                            flow.emit(ProcessingResults.CODE(it[1].toInt()))
+                            flow.emit(ProcessingResults.Closed)
+                        }
+                    }
+                    return flow
+                }
+            }
+        }
+        throw IOException("未知错误",e)
+    }
+
+    Log.i(TAG, "run: bullied")
+
+    val waitQueue = Array(3) {false}
+    launch(dispatcher) {
+        Log.i(TAG, "run: writing")
+        process.outputStream.writer().let {
+            for( i in commandLines) {
+                it.write(i)
+                Log.i(TAG, "run: command{$i}")
+                it.write("\n")
+                it.flush()
+            }
+            process.outputStream.runCatching {
+                close()
+            }
+            waitQueue[0] = true
+        }
+    }
+    launch(dispatcher) {
+        Log.i(TAG, "run: readding")
+        process.inputStream.bufferedReader().lineSequence().forEach {
+            Log.i(TAG, "run: message{$it}")
+            flow.emit(ProcessingResults.Message(it))
+        }
+        waitQueue[1] = true
+    }
+    launch(dispatcher) {
+        process.errorStream.bufferedReader().lineSequence().forEach {
+            Log.w(TAG, "run: error{$it}")
+            flow.emit(ProcessingResults.Error(it))
+        }
+        waitQueue[2] = true
+    }
+    launch(dispatcher) {
+        //等待执行完成
+        while (waitQueue.contains(false)) delay(1)
+        flow.emit(ProcessingResults.CODE(process.waitFor()))
+        kotlin.runCatching {
+            process.inputStream.close()
+            process.errorStream.close()
+            process.destroy()
+        }
+        flow.emit(ProcessingResults.Closed)
+    }
+    return flow
+}
+
+
