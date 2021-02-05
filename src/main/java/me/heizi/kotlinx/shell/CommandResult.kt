@@ -55,7 +55,7 @@ sealed class CommandResult {
         }
     }
 
-    class Success(val message: String): CommandResult()
-    class Failed (val processingMessage: String,val errorMessage:String?,val code: Int):
+    class Success internal constructor(val message: String): CommandResult()
+    class Failed  internal constructor(val processingMessage: String,val errorMessage:String?,val code: Int):
         CommandResult()
 }
