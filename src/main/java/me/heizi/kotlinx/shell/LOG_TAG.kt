@@ -1,3 +1,3 @@
 package me.heizi.kotlinx.shell
 
-const val TAG = "khell"
+internal const val TAG = "khell"
