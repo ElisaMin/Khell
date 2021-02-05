@@ -1,5 +1,6 @@
 package me.heizi.kotlinx.shell
 
+import android.util.Log
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
@@ -31,7 +32,7 @@ sealed class CommandResult {
                     }
                     is ProcessingResults.Error -> {
                         error?.let { e ->
-//                            Log.i(TAG, "waitForResult: error{${it.message}}")
+                            Log.i(TAG, "waitForResult: error{${it.message}}")
                             e.append(it.message)
                             e.append("\n")
                         } ?: run {
@@ -55,7 +56,7 @@ sealed class CommandResult {
         }
     }
 
-    class Success internal constructor(val message: String): CommandResult()
-    class Failed  internal constructor(val processingMessage: String,val errorMessage:String?,val code: Int):
+    data class Success internal constructor(val message: String): CommandResult()
+    data class Failed  internal constructor(val processingMessage: String,val errorMessage:String?,val code: Int):
         CommandResult()
 }
