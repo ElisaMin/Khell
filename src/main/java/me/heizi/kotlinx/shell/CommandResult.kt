@@ -1,5 +1,7 @@
 package me.heizi.kotlinx.shell
 
+import android.os.Parcel
+import android.os.Parcelable
 import android.util.Log
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
@@ -56,7 +58,27 @@ sealed class CommandResult {
         }
     }
 
-    data class Success internal constructor(val message: String): CommandResult()
-    data class Failed  internal constructor(val processingMessage: String,val errorMessage:String?,val code: Int):
-        CommandResult()
+    data class Success internal constructor(val message: String): CommandResult(), Parcelable {
+        constructor(parcel: Parcel) : this(parcel.readString()!!)
+        override fun writeToParcel(parcel: Parcel, flags: Int) = parcel.writeString(message)
+        override fun describeContents(): Int = 0
+        companion object CREATOR : Parcelable.Creator<Success> {
+            override fun createFromParcel(parcel: Parcel): Success = Success(parcel)
+            override fun newArray(size: Int): Array<Success?> = arrayOfNulls(size)
+        }
+    }
+
+    data class Failed internal constructor(val processingMessage: String,val errorMessage:String?,val code: Int): CommandResult(), Parcelable {
+        constructor(parcel: Parcel) : this(parcel.readString()!!, parcel.readString(), parcel.readInt())
+        override fun writeToParcel(parcel: Parcel, flags: Int) {
+            parcel.writeString(processingMessage)
+            parcel.writeString(errorMessage)
+            parcel.writeInt(code)
+        }
+        override fun describeContents(): Int = 0
+        companion object CREATOR : Parcelable.Creator<Failed> {
+            override fun createFromParcel(parcel: Parcel): Failed = Failed(parcel)
+            override fun newArray(size: Int): Array<Failed?> = arrayOfNulls(size)
+        }
+    }
 }
