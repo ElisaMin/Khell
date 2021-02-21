@@ -75,59 +75,48 @@ fun CoroutineScope.shell(
     }
     //runner构建完成
     Log.i(TAG, "run: bullied")
-    //开始run
-    val waitQueue = Array(3) {false}
     launch(dispatcher) {
-        Log.i(TAG, "run: writing")
-        process.outputStream.writer().let {
-            for( i in commandLines) {
-                if (isEcho) {
-                    it.write("echo \"$i\" \n")
+        launch(dispatcher) {
+            Log.i(TAG, "run: writing")
+            process.outputStream.writer().let {
+                for( i in commandLines) {
+                    if (isEcho) {
+                        it.write("echo \"$i\" \n")
+                        it.flush()
+                    }
+                    it.write(i)
+                    Log.i(TAG, "run: command{$i}")
+                    it.write("\n")
                     it.flush()
                 }
-                it.write(i)
-                Log.i(TAG, "run: command{$i}")
-                it.write("\n")
-                it.flush()
+                process.outputStream.runCatching {
+                    close()
+                }
             }
-            process.outputStream.runCatching {
-                close()
+        }
+        launch(dispatcher) {
+            process.inputStream.bufferedReader().lineSequence().forEach {
+                flow.emit(ProcessingResults.Message(it))
+                Log.i(TAG, "run: message{$it}")
             }
-            waitQueue[0] = true
         }
-    }
-    launch(dispatcher) {
-        process.inputStream.bufferedReader().lineSequence().forEach {
-            flow.emit(ProcessingResults.Message(it))
-            Log.i(TAG, "run: message{$it}")
+        //如果混合消息则直接跳过这次的collect
+        if (!isMixingMessage) launch(dispatcher) {
+            process.errorStream.bufferedReader().lineSequence().forEach {
+                flow.emit(ProcessingResults.Error(it))
+                Log.w(TAG, "run: error{$it}")
+            }
         }
-        waitQueue[1] = true
-    }
-    //如果混合消息则直接跳过这次的collect
-    if (!isMixingMessage) launch(dispatcher) {
-        process.errorStream.bufferedReader().lineSequence().forEach {
-            flow.emit(ProcessingResults.Error(it))
-            Log.w(TAG, "run: error{$it}")
+    }.invokeOnCompletion {
+        launch(dispatcher) {
+            flow.emit(ProcessingResults.CODE(process.waitFor()))
+            kotlin.runCatching {
+                process.inputStream.close()
+                process.errorStream.close()
+                process.destroy()
+            }
+            flow.emit(ProcessingResults.Closed)
         }
-        waitQueue[2] = true
-    } else waitQueue[2] = true
-
-    launch(dispatcher) {
-        //等待执行完成
-        //如果100毫秒内没有反应等待100毫秒
-        var times = 0
-        while (waitQueue.contains(false)) {
-            if(times++ > 100) delay(99)
-            if(times > 104) delay(100)
-            delay(1)
-        }
-        flow.emit(ProcessingResults.CODE(process.waitFor()))
-        kotlin.runCatching {
-            process.inputStream.close()
-            process.errorStream.close()
-            process.destroy()
-        }
-        flow.emit(ProcessingResults.Closed)
     }
     return flow
 }
