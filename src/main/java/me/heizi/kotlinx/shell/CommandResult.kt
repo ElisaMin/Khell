@@ -56,6 +56,9 @@ sealed class CommandResult {
             }
             return result!!
         }
+        fun Exception.toResult():Failed {
+            return Failed(stackTrace.joinToString(":"),message,-255)
+        }
     }
 
     data class Success internal constructor(val message: String): CommandResult(), Parcelable {
