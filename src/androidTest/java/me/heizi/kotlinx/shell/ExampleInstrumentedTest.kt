@@ -1,17 +1,14 @@
 package me.heizi.kotlinx.shell
 
 import android.util.Log
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import me.heizi.kotlinx.shell.OneTimeExecutor.Companion.su
-
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
-
-import org.junit.Assert.*
 
 private const val TAG = "ExampleInstrumentedTest"
 /**

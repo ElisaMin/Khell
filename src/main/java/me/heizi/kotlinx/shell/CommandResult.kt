@@ -56,8 +56,9 @@ sealed class CommandResult {
             }
             return result!!
         }
+        private var errorTimes = -1
         fun Exception.toResult():Failed {
-            return Failed(stackTrace.joinToString(":"),message,-255)
+            return Failed(stackTrace.joinToString(":"),message, errorTimes--)
         }
     }
 
