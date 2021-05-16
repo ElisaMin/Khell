@@ -1,22 +1,28 @@
 package me.heizi.kotlinx.shell
 
 
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.takeWhile
-import kotlinx.coroutines.launch
 import me.heizi.kotlinx.logger.debug
 import me.heizi.kotlinx.logger.error
 import me.heizi.kotlinx.logger.println
+import me.heizi.kotlinx.shell.CommandResult.Companion.waitForResult
 import me.heizi.kotlinx.shell.ProcessingResults.CODE.Companion.SUCCESS
+
+//fun main() = runBlocking {
+//    shell("ping baidu.com").waitForResult().let {
+//        "result".println(it)
+//    }
+//    Unit
+//}
 
 /**
  * 程序结束时会拿到的结果
  */
 sealed class CommandResult {
+
     companion object {
         /**
          * 等待正在执行的程序退出并返回结果
@@ -58,16 +64,11 @@ sealed class CommandResult {
                         GlobalScope.launch {
                             onResult(result!!)
                         }
-                        "result".debug("code",it.code)
-                        "result".debug(result!!::class.simpleName,result)
-                        currentCoroutineContext().cancel()
                     }
-                    is ProcessingResults.Closed -> {
-                        "result".debug(result!!::class.simpleName,result)
-                        currentCoroutineContext().cancel()
-                    }
+                    ProcessingResults.Closed -> throw IllegalStateException("on close")
                 }
             }
+            "result".debug(result!!::class.simpleName,result)
             return result!!
         }
         private var errorTimes = -1

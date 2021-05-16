@@ -46,6 +46,7 @@ fun printlns(vararg msg:Any?) = "shell".println(*msg)
 suspend fun CoroutineScope.shell(
     vararg commandLines:String,
     prefix:Array<String> = arrayOf("cmd","/k", "@echo off", ),
+    globalArg:Map<String,String>?=null,
     isMixingMessage: Boolean = false,
     isWindows_keep: Boolean = true,
     dispatcher: CoroutineDispatcher = Default
@@ -55,7 +56,7 @@ suspend fun CoroutineScope.shell(
     commandLines.forEach {
         printlns("commands",it)
     }
-    return shell(prefix=prefix,isMixingMessage=isMixingMessage,isEcho = false,dispatcher=dispatcher) {
+    return shell(prefix=prefix,isMixingMessage=isMixingMessage,isEcho = false,dispatcher=dispatcher,env = globalArg) {
         if (isWindows_keep) {
             commandLines.forEach(this::run)
             runBlocking {
@@ -96,6 +97,7 @@ suspend fun CoroutineScope.shell(
 @Suppress( "BlockingMethodInNonBlockingContext")
 private suspend fun CoroutineScope.shell(
     prefix:Array<String> = arrayOf("cmd","/k"),
+    env:Map<String,String>? = null,
     isMixingMessage: Boolean = false,
     isEcho: Boolean = false,
     dispatcher: CoroutineDispatcher = Default,
@@ -110,6 +112,8 @@ private suspend fun CoroutineScope.shell(
 
     val process = try {
         ProcessBuilder(*prefix).run {
+            environment().putAll(Khell.env)
+            env?.let { environment().putAll(it) }
             if (isMixingMessage) this.redirectErrorStream(true)
             start()
         }
@@ -163,7 +167,7 @@ private suspend fun CoroutineScope.shell(
         }
 
         launch(dispatcher) {
-            process.inputStream.bufferedReader().lineSequence().forEach {
+            process.inputStream.bufferedReader(charset("GBK")).lineSequence().forEach {
                 flow.emit(ProcessingResults.Message(it))
                 printlns("message", it)
             }
