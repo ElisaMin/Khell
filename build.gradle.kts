@@ -10,7 +10,9 @@ repositories {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3-native-mt")
+
+    @Suppress("UNCHECKED_CAST")
+    (project.extra.get("kotlinCoroutineDependency")!! as DependencyHandler.()->Unit)()
     implementation(project(":logger"))
     implementation(kotlin("stdlib"))
 }
