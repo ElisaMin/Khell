@@ -22,18 +22,21 @@ import me.heizi.kotlinx.logger.println as pppp
 
 
 /**
- * Shell Flow&AsyncCoroutine IMPL
+ * ## Shell - Process的封装类
+ * Create and run a [Process] by command line , that's Shell no matter is Windows call it or not .
+ * This class implemented [Deferred] asynchronous coroutine and [SharedFlow] ,
+ * That means you can use await to wait for [CommandResult]  or collect [ProcessingResults].
  *
- * @property prefix
- * @property env
- * @property isMixingMessage
- * @property isEcho
- * @property onRun
- * @constructor
- * TODO
+ * I recommend the fake constructor if you just want to **run a simple command**
+ * @see Shell.invoke
  *
- * @param coroutineContext
- * @param startWithCreate
+ * @property prefix how to start a process.
+ * @property env event args
+ * @property isMixingMessage stderr redirect to stdout when true
+ * @property isEcho echo command line before run the command line.
+ * @property onRun you can delay or something to using [RunScope.run] run some fancy line.
+ * @param coroutineContext I don't know what's it So I'm just added it.
+ * @param startWithCreate don't you can read the name ? idiot
  */
 @OptIn(InternalCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 class Shell(
@@ -193,7 +196,7 @@ class Shell(
     }
 
     /**
-     * FIXME:永远不可能修复了估计
+     * FIXME:永远不可能修复了估计,来个大佬吧
      */
 
     @Deprecated("DONT USE IT", ReplaceWith("Nothings"))
@@ -204,21 +207,37 @@ class Shell(
 
         /**
          * 假构造器
+         *
          * @see Shell
+         * @param runCommandOnPrefix options bout windows , true means using /c to execute connected commands by && ,
+         * using /k launch a cmd and write command to stdin ,that's false.
          */
         operator fun invoke  (
             vararg commandLines:String,
             globalArg:Map<String,String>?=null,
             isMixingMessage: Boolean = false,
+            runCommandOnPrefix: Boolean = false,
         ):Shell {
-            val prefix = arrayOf("cmd","/k", "@echo off", )
-            val onCreateCommand = arrayOf(prefix.joinToString(" "),*commandLines)
-            println("new command",onCreateCommand.joinToString(" && "))
+            require(commandLines.isNotEmpty()) {
+                "unless one command"
+            }
+            val prefix =
+                if (runCommandOnPrefix) arrayOf(
+                    "cmd","/c",
+                    if (commandLines.size == 1) commandLines[0]
+                    else commandLines.joinToString(" && ")
+                ) else arrayOf("cmd","/k", "@echo off", )
+            //log
+            println("new command",if (runCommandOnPrefix)
+                prefix.joinToString(" && ")
+             else
+                prefix.joinToString(" ")+" "+commandLines.joinToString(" && ")
+            )
             commandLines.forEach {
                 println("commands",it)
             }
             return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false) {
-                commandLines.forEach(this::run)
+                if (!runCommandOnPrefix) commandLines.forEach(this::run)
             }
         }
 
