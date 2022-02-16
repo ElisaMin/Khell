@@ -2,6 +2,7 @@ package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.internal.resumeCancellableWith
@@ -47,7 +48,7 @@ class Shell(
     private val isEcho: Boolean = false,
     startWithCreate: Boolean = true,
     private val onRun: suspend RunScope.() -> Unit,
-): SharedFlow<ProcessingResults>, AbstractCoroutine<CommandResult>(CoroutineScope(IO).newCoroutineContext(coroutineContext), false, false),Deferred<CommandResult> {
+): Flow<ProcessingResults>, AbstractCoroutine<CommandResult>(CoroutineScope(IO).newCoroutineContext(coroutineContext), false, false),Deferred<CommandResult> {
 
     private fun println(any: Any?) = "shell".pppp("running", any.toString())
     private fun debug(any: Any?) = "shell".dddd("running", any.toString())
@@ -59,7 +60,8 @@ class Shell(
     private val continuation = block.createCoroutineUnintercepted(this, this)
     private val collectors = arrayListOf<FlowCollector<ProcessingResults>>()
     private var result:CommandResult? = null
-    override val replayCache: ArrayList<ProcessingResults> = arrayListOf()
+//    override
+    val replayCache: ArrayList<ProcessingResults> = arrayListOf()
     private val process by lazy {
         runCatching {
             ProcessBuilder(*prefix).run {
@@ -175,13 +177,15 @@ class Shell(
         }.join()
     }
 
-    @InternalCoroutinesApi
+
     override suspend fun collect(collector: FlowCollector<ProcessingResults>) {
         debug("run: ${start()}")
+
         replayCache.forEach {
             collector.emit(it)
         }
         collectors.add(collector)
+
     }
 
     override suspend fun await(): CommandResult {

@@ -1,3 +1,4 @@
+import me.heizi.gradle.Libs
 plugins {
     kotlin("jvm")
 }
@@ -12,7 +13,7 @@ repositories {
 dependencies {
 
     @Suppress("UNCHECKED_CAST")
-    (project.extra.get("kotlinCoroutineDependency")!! as DependencyHandler.()->Unit)()
+    implementation(Libs.Coroutine)
     implementation(project(":logger"))
     implementation(kotlin("stdlib"))
 }
