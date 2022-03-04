@@ -55,6 +55,7 @@ class Shell(
 
     private val block:suspend CoroutineScope.()->CommandResult = {
         run()
+        debug("block returning")
         result!!
     }
     private val continuation = block.createCoroutineUnintercepted(this, this)
@@ -107,6 +108,7 @@ class Shell(
     override fun onStart() {
         try {
             continuation.intercepted().resumeCancellableWith(Result.success(Unit))
+            debug("resumed")
         }catch (e:Exception) {
             error("$e")
         }
@@ -175,6 +177,7 @@ class Shell(
             emit(ProcessingResults.Closed)
             debug("emit closed")
         }.join()
+        debug("run out")
     }
 
 
@@ -189,7 +192,9 @@ class Shell(
     }
 
     override suspend fun await(): CommandResult {
+        debug("waiting")
         while (result==null) {}
+        debug("awaited")
         return result!!
     }
 
