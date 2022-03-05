@@ -226,6 +226,7 @@ class Shell(
             globalArg:Map<String,String>?=null,
             isMixingMessage: Boolean = false,
             runCommandOnPrefix: Boolean = false,
+            startWithCreate: Boolean = true,
         ):Shell {
             require(commandLines.isNotEmpty()) {
                 "unless one command"
@@ -245,7 +246,7 @@ class Shell(
             commandLines.forEach {
                 println("commands",it)
             }
-            return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false) {
+            return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate) {
                 if (!runCommandOnPrefix) commandLines.forEach(this::run)
             }
         }
