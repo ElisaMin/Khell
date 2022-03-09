@@ -66,7 +66,7 @@ class Shell(
     private val process by lazy {
         runCatching {
             ProcessBuilder(*prefix).run {
-                environment().putAll(Khell.env)
+//                environment().putAll(Khell.env)
                 env?.let { environment().putAll(it) }
                 if (isMixingMessage) this.redirectErrorStream(true)
                 start()
