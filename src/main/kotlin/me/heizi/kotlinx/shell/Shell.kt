@@ -61,8 +61,8 @@ class Shell(
     private val continuation = block.createCoroutineUnintercepted(this, this)
     private val collectors = arrayListOf<FlowCollector<ProcessingResults>>()
     private var result:CommandResult? = null
-//    override
-    val replayCache: ArrayList<ProcessingResults> = arrayListOf()
+
+    private val replayCache: ArrayList<ProcessingResults> = arrayListOf()
     private val process by lazy {
         runCatching {
             ProcessBuilder(*prefix).run {
@@ -193,7 +193,7 @@ class Shell(
 
     override suspend fun await(): CommandResult {
         debug("waiting")
-        while (result==null) {}
+        while (result==null) Unit
         debug("awaited")
         return result!!
     }
