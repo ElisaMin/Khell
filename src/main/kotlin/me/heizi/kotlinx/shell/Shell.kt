@@ -7,8 +7,6 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.internal.resumeCancellableWith
 import kotlinx.coroutines.selects.SelectClause1
-import me.heizi.kotlinx.logger.error
-import me.heizi.kotlinx.logger.toString
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
 import me.heizi.kotlinx.shell.WriterRunScope.Companion.getDefaultRunScope
 import java.io.IOException
@@ -17,6 +15,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.intrinsics.createCoroutineUnintercepted
 import kotlin.coroutines.intrinsics.intercepted
 import me.heizi.kotlinx.logger.debug as dddd
+import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
 
@@ -47,11 +46,14 @@ class Shell(
     private val isMixingMessage: Boolean = false,
     private val isEcho: Boolean = false,
     startWithCreate: Boolean = true,
+    val id: Int = idMaker++,
     private val onRun: suspend RunScope.() -> Unit,
 ): Flow<ProcessingResults>, AbstractCoroutine<CommandResult>(CoroutineScope(IO).newCoroutineContext(coroutineContext), false, false),Deferred<CommandResult> {
 
-    private fun println(any: Any?) = "shell".pppp("running", any.toString())
-    private fun debug(any: Any?) = "shell".dddd("running", any.toString())
+    private val idS = "shell#${id}"
+    private fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
+    private fun debug(vararg any: Any?) = idS.dddd("running", *any)
+    private fun error(vararg any: Any?) = idS.eeee("running", *any)
 
     private val block:suspend CoroutineScope.()->CommandResult = {
         run()
@@ -124,35 +126,36 @@ class Shell(
             collector.emit(processingResults)
         }
         if (processingResults is ProcessingResults.Closed) {
-            result = replayCache.toResult()
+            result = replayCache.toResult(id)
         }
     }
 
+    private val newIOContext get() = coroutineContext+IO+EmptyCoroutineContext
 
-    private suspend fun run()  {
+    private suspend inline fun run()  {
         debug("building runner")
         require(process!=null) {
-            "process is not running even"
+            "process is not even running"
         }
+
         val process = this.process!!
-        fun newIOContext() = coroutineContext+IO+EmptyCoroutineContext
         debug("runner bullied")
 
-        val msgJob = launch(newIOContext()) {
+        val msgJob = launch(newIOContext) {
             process.inputStream.bufferedReader(charset("GBK")).lineSequence().forEach {
                 emit(ProcessingResults.Message(it))
                 println("message", it)
             }
         }
         //如果混合消息则直接跳过这次的collect
-        val errJob = if (!isMixingMessage) launch(newIOContext()) {
+        val errJob = if (!isMixingMessage) launch(newIOContext) {
             process.errorStream.bufferedReader(charset("GBK")).lineSequence().forEach {
                 emit(ProcessingResults.Error(it))
-                "shell".error("failed", it)
+                error("failed", it)
             }
         } else null
-        val writeJob = launch(newIOContext()) {
-            process.outputStream.writer().getDefaultRunScope(isEcho).let {
+        val writeJob = launch(newIOContext) {
+            process.outputStream.writer().getDefaultRunScope(isEcho,id).let {
                 debug("writing")
                 onRun(it)
             }
@@ -188,12 +191,12 @@ class Shell(
             collector.emit(it)
         }
         collectors.add(collector)
-
+        while (result==null) delay(10)
     }
 
     override suspend fun await(): CommandResult {
         debug("waiting")
-        while (result==null) Unit
+        while (result==null) delay(10)
         debug("awaited")
         return result!!
     }
@@ -214,6 +217,7 @@ class Shell(
 
     companion object {
 
+        var idMaker = 0
         /**
          * 假构造器
          *
@@ -228,6 +232,8 @@ class Shell(
             runCommandOnPrefix: Boolean = false,
             startWithCreate: Boolean = true,
         ):Shell {
+            val id = idMaker++
+            fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
             require(commandLines.isNotEmpty()) {
                 "unless one command"
             }
@@ -246,7 +252,7 @@ class Shell(
             commandLines.forEach {
                 println("commands",it)
             }
-            return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate) {
+            return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate, id = id) {
                 if (!runCommandOnPrefix) commandLines.forEach(this::run)
             }
         }

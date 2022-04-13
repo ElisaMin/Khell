@@ -1,14 +1,12 @@
-@file:OptIn(InternalCoroutinesApi::class)
+
 package me.heizi.kotlinx.shell
 
 /**
  * 单次执行 执行完毕后立即作废 设计缺陷
  */
 
-import kotlinx.coroutines.InternalCoroutinesApi
 import me.heizi.kotlinx.logger.debug
 import java.io.OutputStreamWriter
-import me.heizi.kotlinx.logger.println as logp
 
 
 /**
@@ -21,7 +19,7 @@ interface RunScope {
 }
 
 internal class WriterRunScope(
-    private val writer: OutputStreamWriter, private val isEcho: Boolean = false
+    private val writer: OutputStreamWriter, private val isEcho: Boolean = false,private val id :Int
 ):RunScope {
     override fun run(command: String) {
         if (isEcho) {
@@ -29,7 +27,7 @@ internal class WriterRunScope(
             writer.flush()
         }
         writer.write(command)
-        "shell".debug("command", command)
+        "shell#$id".debug("command", command)
         writer.write("\n")
         writer.flush()
     }
@@ -39,7 +37,7 @@ internal class WriterRunScope(
 //    }
 
     companion object {
-        internal fun OutputStreamWriter.getDefaultRunScope(isEcho: Boolean = false) = WriterRunScope(this,isEcho)
+        internal fun OutputStreamWriter.getDefaultRunScope(isEcho: Boolean = false,id:Int) = WriterRunScope(this,isEcho,id)
     }
 
 }
@@ -51,5 +49,3 @@ internal val exceptionRegex by lazy {
     "Cannot run program \".+\": error=(\\d+), (.+)"
         .toRegex()
 }
-
-fun println(vararg msg:Any?) = "shell".logp(*msg)

@@ -9,20 +9,24 @@ import me.heizi.kotlinx.logger.debug
  */
 sealed class CommandResult {
 
+
     companion object {
+        private var idMaker = 0
 
         /**
          * 对完整的ResultList进行整合
          * @return 另外一种形式的ResultList(
          */
-        fun List<ProcessingResults>.toResult():CommandResult {
+        fun List<ProcessingResults>.toResult(id:Int= idMaker++):CommandResult {
+            val key = "toResult#${ id }"
+            key.debug("new")
             require(last() is ProcessingResults.Closed) {
                 "process is running still !!"
             }
             val msg = StringBuilder()
             val err = StringBuilder()
             var code = Int.MIN_VALUE
-            "result".debug(this)
+            key.debug("size",this.size)
             forEach { when(it) {
                 is ProcessingResults.Message -> msg.appendLine(it.message)
                 is ProcessingResults.Error -> err.appendLine(it.message)
@@ -30,8 +34,8 @@ sealed class CommandResult {
                 else -> {}
             } }
 
-            "result".debug(msg)
-            "result".debug(err)
+            key.debug(msg.toString().lines().joinToString(limit = 5))
+            key.debug(err.toString().lines().joinToString(limit = 5))
             return if (code != 0 )
                 Failed(
                     msg.toString().dropLastWhile { it=='\n' },
