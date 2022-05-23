@@ -10,6 +10,7 @@ import kotlinx.coroutines.selects.SelectClause1
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
 import me.heizi.kotlinx.shell.WriterRunScope.Companion.getDefaultRunScope
 import java.io.IOException
+import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.intrinsics.createCoroutineUnintercepted
@@ -36,6 +37,7 @@ import me.heizi.kotlinx.logger.println as pppp
  * @property isEcho echo command line before run the command line.
  * @property onRun you can delay or something to using [RunScope.run] run some fancy line.
  * @param coroutineContext I don't know what's it So I'm just added it.
+ * @param charset make sure you won't see some fancy line you have never seen before
  * @param startWithCreate don't you can read the name ? idiot
  */
 @OptIn(InternalCoroutinesApi::class, ExperimentalCoroutinesApi::class)
@@ -47,6 +49,7 @@ class Shell(
     private val isEcho: Boolean = false,
     startWithCreate: Boolean = true,
     val id: Int = idMaker++,
+    private val charset: Charset = charset("GBK"),
     private val onRun: suspend RunScope.() -> Unit,
 ): Flow<ProcessingResults>, AbstractCoroutine<CommandResult>(CoroutineScope(IO).newCoroutineContext(coroutineContext), false, false),Deferred<CommandResult> {
 
@@ -142,20 +145,20 @@ class Shell(
         debug("runner bullied")
 
         val msgJob = launch(newIOContext) {
-            process.inputStream.bufferedReader(charset("GBK")).lineSequence().forEach {
+            process.inputStream.bufferedReader(charset).lineSequence().forEach {
                 emit(ProcessingResults.Message(it))
                 println("message", it)
             }
         }
         //如果混合消息则直接跳过这次的collect
         val errJob = if (!isMixingMessage) launch(newIOContext) {
-            process.errorStream.bufferedReader(charset("GBK")).lineSequence().forEach {
+            process.errorStream.bufferedReader(charset).lineSequence().forEach {
                 emit(ProcessingResults.Error(it))
                 error("failed", it)
             }
         } else null
         val writeJob = launch(newIOContext) {
-            process.outputStream.writer().getDefaultRunScope(isEcho,id).let {
+            process.outputStream.writer(charset).getDefaultRunScope(isEcho,id).let {
                 debug("writing")
                 onRun(it)
             }
@@ -231,6 +234,7 @@ class Shell(
             isMixingMessage: Boolean = false,
             runCommandOnPrefix: Boolean = false,
             startWithCreate: Boolean = true,
+            charset: Charset = charset("GBK")
         ):Shell {
             val id = idMaker++
             fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
@@ -252,7 +256,7 @@ class Shell(
             commandLines.forEach {
                 println("commands",it)
             }
-            return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate, id = id) {
+            return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate, id = id, charset = charset) {
                 if (!runCommandOnPrefix) commandLines.forEach(this::run)
             }
         }
