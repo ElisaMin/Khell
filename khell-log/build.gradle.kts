@@ -6,6 +6,19 @@ plugins {
 
 kotlin {
     jvm()
+    sourceSets {
+        val commonMain by getting
+        val jvmMain by getting {
+            dependencies {
+                api("org.slf4j:slf4j-api:${versions["slf4j"]}")
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+                implementation("org.slf4j:slf4j-log4j12:${versions["slf4j"]}")
+            }
+        }
+    }
 }
 
 
