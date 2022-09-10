@@ -27,7 +27,7 @@ kotlin {
 
 
 group = "me.heizi.kotlinx"
-version = versions["kotlin"]
+version = versions["khell"]
 
 
 //

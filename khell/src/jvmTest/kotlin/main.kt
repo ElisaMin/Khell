@@ -1,13 +1,10 @@
-import kotlinx.coroutines.runBlocking
-import me.heizi.kotlinx.logger.println
-import me.heizi.kotlinx.shell.CommandResult.Companion.waitForResult
-import me.heizi.kotlinx.shell.shell
+import me.heizi.kotlinx.shell.Shell
 
 
-suspend fun main() = runBlocking {
+suspend fun main() {
     println("called")
 
-    println(shell(*arrayOf("echo heizi")).waitForResult())
+
+    println(Shell("echo heizi").await())
     println("callledddd")
-    Unit
 }
