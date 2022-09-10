@@ -1,16 +1,19 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import me.heizi.koltinx.version.versions
+
+
 plugins {
-    kotlin("jvm")
+    kotlin("multiplatform") apply false
 }
 
 group = "me.heizi.kotlinx"
-version = "1.0"
+version = versions["khell"]
 
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3-native-mt")
-    implementation(project(":logger"))
-    implementation(kotlin("stdlib"))
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+    tasks.withType<KotlinCompile> {
+        kotlinOptions.jvmTarget = "17"
+    }
 }
