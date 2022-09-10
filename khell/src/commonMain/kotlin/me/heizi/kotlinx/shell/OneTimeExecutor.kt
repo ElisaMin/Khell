@@ -25,14 +25,6 @@ private val exceptionRegex by lazy {
     .toRegex()
 }
 
-fun main() = runBlocking {
-    println("called")
-
-    println(shell(*arrayOf("echo heizi")).waitForResult())
-    println("callledddd")
-    Unit
-}
-
 fun printlns(vararg msg:Any?) = "shell".println(*msg)
 
 /**
