@@ -3,7 +3,8 @@ a kotlin-ful shell executor
 ## Help this project
 I'm not read the hold document of Coroutines and just wrote it, 
 so I think there's some misunderstandings on kotlin coroutine APIs, is that I overthink ? take a talk on Issues #2 maybe ? to...help this lib keep working?
-## with Gradle & Jitpack
+## add to your project
+### with Gradle & Jitpack
 [![](https://jitpack.io/v/ElisaMin/Khell.svg)](https://jitpack.io/#ElisaMin/Khell)
 ### maven
 ```kotlin
@@ -21,6 +22,9 @@ implementation("com.github.ElisaMin:khell:main")
 //implementation("com.github.ElisaMin:khell-log:main")
 //or api("com.github.ElisaMin:khell-log:main")
 ```
+
+### with Gradle & GithubRepo
+.....
 ## use as JVM for Windows
 ```kotlin
 Shell(Dispatchers.IO) {
