@@ -3,6 +3,19 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Khell.iml" filepath="$PROJECT_DIR$/.idea/Khell.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Khell.buildSrc.iml" filepath="$PROJECT_DIR$/.idea/modules/Khell.buildSrc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Khell.buildSrc.main.iml" filepath="$PROJECT_DIR$/.idea/modules/Khell.buildSrc.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Khell.buildSrc.test.iml" filepath="$PROJECT_DIR$/.idea/modules/Khell.buildSrc.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.iml" filepath="$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.commonMain.iml" filepath="$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.commonMain.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.commonTest.iml" filepath="$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.commonTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.jvmMain.iml" filepath="$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.jvmMain.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.jvmTest.iml" filepath="$PROJECT_DIR$/.idea/modules/khell-log/Khell.khell-log.jvmTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.commonMain.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.commonMain.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.commonTest.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.commonTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.jvmMain.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.jvmMain.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.jvmTest.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.jvmTest.iml" />
     </modules>
   </component>
 </project>

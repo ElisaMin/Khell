@@ -1,8 +1,12 @@
+import me.heizi.koltinx.version.props
 import me.heizi.koltinx.version.versions
 
 plugins {
     kotlin("multiplatform")
+    `maven-publish`
 }
+
+
 
 kotlin {
     jvm()
@@ -27,6 +31,9 @@ group = "me.heizi.kotlinx"
 version = versions["khell"]
 
 
+//apply(rootProject.file("publishing.gradle.kts"))
+
+
 dependencies {
 
 }
@@ -40,4 +47,3 @@ dependencies {
 //tasks.getByName<Test>("test") {
 //    useJUnitPlatform()
 //}
-
