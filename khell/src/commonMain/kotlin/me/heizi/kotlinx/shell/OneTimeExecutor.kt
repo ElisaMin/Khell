@@ -14,7 +14,7 @@ import java.io.OutputStreamWriter
  *
  */
 interface RunScope {
-    fun run(command:String)
+    infix fun run(command:String)
 //    fun write(string: String)
 }
 
