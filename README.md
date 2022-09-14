@@ -1,5 +1,5 @@
 # Kotlin Shell
-a kotlin-ful shell executor
+a simple and powerful command line executor with kotlin dsl, coroutine and multiplatform supported.
 ## Help this project
 I'm not read the hold document of Coroutines and just wrote it, 
 so I think there's some misunderstandings on kotlin coroutine APIs, is that I overthink ? take a talk on Issues #2 maybe ? to...help this lib keep working?
@@ -12,15 +12,24 @@ maven { url = uri("https://jitpack.io")}
 ```
 ### dependencies
 ```kotlin
-//coroutine required!
-implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:+")
-// jvm log impl
+// required: coroutine
+implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+
+// gradle.properties if you're
+val khellVersion = extra["khell.version"] as String
+
+// Khell
+implementation("com.github.ElisaMin:khell:$khellVersion")
+// or Khell Android
+implementation("com.github.ElisaMin:khell-android:$khellVersion")
+// or Khell JVM
+implementation("com.github.ElisaMin:khell-jvm:$khellVersion")
+
+// option: but JVM log impl must be
 implementation("org.slf4j:slf4j-log4j12:+")
-//Khell
-implementation("com.github.ElisaMin:khell:main")
-//LOG lib
-//implementation("com.github.ElisaMin:khell-log:main")
-//or api("com.github.ElisaMin:khell-log:main")
+
+// option: the LOG lib
+//implementation("com.github.ElisaMin:khell-log:$khellVersion")
 ```
 
 ### with Gradle & GithubRepo
