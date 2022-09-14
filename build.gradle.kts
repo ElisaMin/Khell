@@ -1,7 +1,7 @@
 import me.heizi.koltinx.version.*
-import org.gradle.kotlin.dsl.publishing
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+apply("gradle/genLocal.gradle.kts")
 
 plugins {
     kotlin("multiplatform") apply false
@@ -46,4 +46,3 @@ allprojects {
         kotlinOptions.jvmTarget = "11"
     }
 }
-
