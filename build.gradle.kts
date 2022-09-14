@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("multiplatform") apply false
+    id("com.android.library") apply false
 }
 
 group = "me.heizi.kotlinx"
@@ -38,10 +39,11 @@ subprojects {
 
 allprojects {
     repositories {
+        google()
         mavenCentral()
     }
     tasks.withType<KotlinCompile> {
-        kotlinOptions.jvmTarget = "17"
+        kotlinOptions.jvmTarget = "11"
     }
 }
 

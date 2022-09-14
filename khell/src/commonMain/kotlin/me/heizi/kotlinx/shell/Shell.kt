@@ -43,13 +43,13 @@ import me.heizi.kotlinx.logger.println as pppp
 @OptIn(InternalCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 class Shell(
     coroutineContext: CoroutineContext= EmptyCoroutineContext,
-    private val prefix: Array<String> = arrayOf("cmd", "/k"),
+    private val prefix: Array<String> = defaultPrefix,
     private val env: Map<String, String>? = null,
     private val isMixingMessage: Boolean = false,
     private val isEcho: Boolean = false,
     startWithCreate: Boolean = true,
     val id: Int = idMaker++,
-    private val charset: Charset = charset("GBK"),
+    private val charset: Charset = defaultCharset,
     private val onRun: suspend RunScope.() -> Unit,
 ): Flow<ProcessingResults>, AbstractCoroutine<CommandResult>(CoroutineScope(IO).newCoroutineContext(coroutineContext), false, false),Deferred<CommandResult> {
 
@@ -225,42 +225,38 @@ class Shell(
          * 假构造器
          *
          * @see Shell
-         * @param runCommandOnPrefix options bout windows , true means using /c to execute connected commands by && ,
-         * using /k launch a cmd and write command to stdin ,that's false.
+         * @param isKeepCLIAndWrite ture means launch the Non-Close-CLI first and write command lines after. it'll exit
+         * while read the exit command on your [commandLines]. run on Prefix that joined commands by && sign if false
          */
+//        @Deprecated("will remove on next version cuz multiplatform supporting")
+        @Suppress("NAME_SHADOWING")
         operator fun invoke  (
             vararg commandLines:String,
             globalArg:Map<String,String>?=null,
             isMixingMessage: Boolean = false,
-            runCommandOnPrefix: Boolean = false,
+            isKeepCLIAndWrite: Boolean = false,// keep cmd maybe (
             startWithCreate: Boolean = true,
-            charset: Charset = charset("GBK")
+            charset: Charset = defaultCharset,
+            prefix: Array<String> = defaultPrefix
         ):Shell {
             val id = idMaker++
             fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
             require(commandLines.isNotEmpty()) {
                 "unless one command"
             }
-            val prefix =
-                if (runCommandOnPrefix) arrayOf(
-                    "cmd","/c",
-                    if (commandLines.size == 1) commandLines[0]
+            val prefix = if (isKeepCLIAndWrite) keepCLIPrefix else
+                prefix + commandLines.run {
+                    if (size == 1) first()
                     else commandLines.joinToString(" && ")
-                ) else arrayOf("cmd","/k", "@echo off", )
-            //log
-            println("new command",if (runCommandOnPrefix)
-                prefix.joinToString(" && ")
-             else
-                prefix.joinToString(" ")+" "+commandLines.joinToString(" && ")
+                }
+            // Log
+            println("new command",
+                (if (isKeepCLIAndWrite) prefix.joinToString(" && ") else prefix.joinToString(" ")+" "+commandLines.joinToString(" && "))
             )
-            commandLines.forEach {
-                println("commands",it)
-            }
             return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate, id = id, charset = charset) {
-                if (!runCommandOnPrefix) commandLines.forEach(this::run)
+                if (!isKeepCLIAndWrite) commandLines.forEach(this::run)
             }
         }
-
     }
 }
 
