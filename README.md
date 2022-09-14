@@ -3,6 +3,48 @@ a simple and powerful command line executor with kotlin dsl, coroutine and multi
 ## Help this project
 I'm not read the hold document of Coroutines and just wrote it, 
 so I think there's some misunderstandings on kotlin coroutine APIs, is that I overthink ? take a talk on Issues #2 maybe ? to...help this lib keep working?
+
+# QuickStart
+
+## read the docs and code 
+it's a veeeeery simple lib with JUST 1 CORE FILE, and it's 200 lines code only. so [just read it](khell/src/commonMain/kotlin/me/heizi/kotlinx/shell/Shell.kt)   
+```kotlin
+Shell("echo hello world").await() {
+    if (it is CommandResult.Success) it.let(::println)
+}
+Shell("ping xvidoes.com")
+    .collect(::println)
+
+val req = Shell {
+    if ( foo ) 
+        run("bar")
+    if ( foo2 ){
+        write("bar2")
+        run()
+    }
+}
+delay(3000)
+req
+    .await()
+    .let(::doSth)
+```
+## there has a log lib
+```kotlin
+import me.heizi.koltinx.loggger.error
+import me.heizi.koltinx.loggger.println
+
+
+class `class name as tag` {
+    
+    fun log(msg:String) 
+        = this.println("msg-log",msg)
+    
+    fun err(msg:String)
+        = this.error("msg-log",msg)
+}
+
+```
+
 ## add to your project
 ### with Gradle & Jitpack
 [![](https://jitpack.io/v/ElisaMin/Khell.svg)](https://jitpack.io/#ElisaMin/Khell)
@@ -34,14 +76,3 @@ implementation("org.slf4j:slf4j-log4j12:+")
 
 ### with Gradle & GithubRepo
 .....
-## use as JVM for Windows
-```kotlin
-Shell(Dispatchers.IO) {
-    run("echo hello world")
-}.run {
-    collect { //result as flow
-        
-    }
-    await() //result as Deferred
-}
-```
