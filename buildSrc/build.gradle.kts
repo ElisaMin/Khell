@@ -1,6 +1,6 @@
 plugins {
     `kotlin-dsl`
-    `maven-publish`
+//    `maven-publish`
 }
 repositories {
     mavenCentral()

@@ -2,7 +2,6 @@ package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.internal.resumeCancellableWith
@@ -51,7 +50,7 @@ class Shell(
     val id: Int = idMaker++,
     private val charset: Charset = defaultCharset,
     private val onRun: suspend RunScope.() -> Unit,
-): Flow<ProcessingResults>, AbstractCoroutine<CommandResult>(CoroutineScope(IO).newCoroutineContext(coroutineContext), false, false),Deferred<CommandResult> {
+): KShell, AbstractCoroutine<CommandResult>(CoroutineScope(IO).newCoroutineContext(coroutineContext), false, false),Deferred<CommandResult> {
 
     private val idS = "shell#${id}"
     private fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)

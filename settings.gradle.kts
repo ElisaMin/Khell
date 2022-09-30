@@ -15,5 +15,6 @@ pluginManagement {
 
 
 rootProject.name = "Khell"
+//includeBuild("gradle-ext")
 include("khell-log")
 include("khell")
