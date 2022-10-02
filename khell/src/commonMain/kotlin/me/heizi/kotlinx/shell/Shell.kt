@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.internal.resumeCancellableWith
 import kotlinx.coroutines.selects.SelectClause1
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
-import me.heizi.kotlinx.shell.WriterRunScope.Companion.getDefaultRunScope
 import java.io.IOException
 import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
@@ -47,10 +46,10 @@ class Shell(
     private val isMixingMessage: Boolean = false,
     private val isEcho: Boolean = false,
     startWithCreate: Boolean = true,
-    val id: Int = idMaker++,
+    override val id: Int = idMaker++,
     private val charset: Charset = defaultCharset,
     private val onRun: suspend RunScope.() -> Unit,
-): KShell, AbstractCoroutine<CommandResult>(CoroutineScope(IO).newCoroutineContext(coroutineContext), false, false),Deferred<CommandResult> {
+): AbstractKShell(coroutineContext, prefix, env, isMixingMessage, isEcho, startWithCreate, id, charset, onRun) {
 
     private val idS = "shell#${id}"
     private fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
@@ -218,6 +217,14 @@ class Shell(
 
 
     companion object {
+
+        /**
+         * 用于匹配错误的Regex
+         */
+        internal val exceptionRegex by lazy {
+            "Cannot run program \".+\": error=(\\d+), (.+)"
+                .toRegex()
+        }
 
         var idMaker = 0
         /**

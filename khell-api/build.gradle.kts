@@ -14,29 +14,12 @@ kotlin {
         commonMain {
             dependencies {
                 api(project(":khell-log"))
-                implementation(project(":khell-api"))
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:${versions["coroutine"]}")
             }
         }
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
-            }
-        }
-        val jvmTest by getting {
-            dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:${versions["coroutine"]}")
-                implementation("org.slf4j:slf4j-log4j12:${versions["slf4j"]}")
-            }
-        }
-        val androidMain by getting {
-            dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:${versions["coroutine"]}")
-            }
-        }
-        val androidTest by getting {
-            dependencies {
-                implementation ("androidx.test.ext:junit:1.1.3")
             }
         }
 

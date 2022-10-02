@@ -11,7 +11,7 @@ sealed class ProcessingResults {
     /**
      * [Process.exitValue] 退出返回值
      */
-    class CODE internal constructor(val code:Int):ProcessingResults() {
+    class CODE constructor(val code:Int):ProcessingResults() {
 
         companion object {
             const val SUCCESS = 0
@@ -27,7 +27,7 @@ sealed class ProcessingResults {
      *
      * @param message  错误数据的本身
      */
-    class Error internal constructor(val message:String):ProcessingResults() {
+    class Error constructor(val message:String):ProcessingResults() {
         override fun toString(): String {
             return "Error(message='$message')"
         }
@@ -38,7 +38,7 @@ sealed class ProcessingResults {
      *
      * @param message
      */
-    class Message internal constructor(val message: String):ProcessingResults() {
+    class Message constructor(val message: String):ProcessingResults() {
         override fun toString(): String {
             return "Message(message='$message')"
         }
@@ -47,7 +47,11 @@ sealed class ProcessingResults {
     /**
      * Closed process执行完毕
      */
-    object Closed : ProcessingResults()
+    object Closed : ProcessingResults() {
+        override fun toString(): String
+            = "Closed"
+
+    }
 
     /**
      * Starting 正在启动
