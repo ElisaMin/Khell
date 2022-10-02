@@ -21,15 +21,24 @@ expect fun Any?.debug(any: Any?)
  *
  * just to string
  */
-fun Any?.toStringNamed():String = when(this) {
+fun Any?.toStringNamed(separator:String = ", ", prefix: String ="[", suffix: String = "]"):String = when(this) {
     is String -> this
     null -> "Nothings"
-    is Iterable<*> -> this.joinToString(",")
+    is Iterable<*> -> buildString {
+        append(prefix)
+        this@toStringNamed.forEach {
+            append(it.toStringNamed(","))
+            append(separator)
+        }
+        delete(length-separator.length,length)
+        append(suffix)
+    }
+    is Array<*> -> toList().toStringNamed(separator,prefix,suffix)
     else -> toString()
 }
 
-fun Any?.println(vararg any: Any?):Unit = this.Println(any.joinToString(": "))
-fun Any?.error(vararg any: Any?):Unit = this.Error(any.joinToString(": "))
-fun Any?.debug(vararg any: Any?):Unit = this.Debug(any.joinToString(": "))
+fun Any?.println(vararg any: Any?):Unit = this.Println(any.toStringNamed(": ","",""))
+fun Any?.error(vararg any: Any?):Unit = this.Error(any.toStringNamed(": ","",""))
+fun Any?.debug(vararg any: Any?):Unit = this.Debug(any.toStringNamed(": ","",""))
 
 

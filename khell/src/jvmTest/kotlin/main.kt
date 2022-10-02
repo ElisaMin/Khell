@@ -17,24 +17,21 @@ operator fun String.not() {
 
 suspend fun main() {
     !"start"
-//    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
-//        run("ping baidu.com")
-//    }.await()
-//    !"old shell ping"
-//    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
-//        run("ping baidu.com")
-//    }.await()
-//    !"new shell ping"
+    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
+        run("ping baidu.com")
+    }.await()
+    !"old shell ping"
+    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
+        run("ping baidu.com")
+    }.await()
+    !"new shell ping"
     repeat(3) {
-        coroutineScope {
-            launch {
-                val shell = shell(prefix = keepCLIPrefix) {
-                    run("echo heizi")
-                }
-                println("out-line")
-                shell.await().let(::println)
-            }
-        }
+
+        shell(prefix = keepCLIPrefix) {
+            run("echo heizi")
+        }.await()
+
+
     }
     !"shell"
     repeat(3,) {

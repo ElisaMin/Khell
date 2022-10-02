@@ -2,10 +2,8 @@ package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.selects.select
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
-import me.heizi.kotlinx.shell.WriterRunScope.Companion.getDefaultRunScope
-import java.io.BufferedInputStream
+import me.heizi.kotlinx.shell.Shell.Companion.exceptionRegex
 import java.io.IOException
 import java.io.InputStream
 import java.nio.charset.Charset
@@ -15,7 +13,8 @@ import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
 
-interface KShell: Flow<ProcessingResults>, Deferred<CommandResult>
+
+@Deprecated("its shit.")
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("NAME_SHADOWING")
@@ -34,42 +33,37 @@ suspend fun shell(
     val coroutineName = CoroutineName("shell-worker#$id")
     val coroutineContext = newCoroutineContext(coroutineContext)+coroutineName
     val thisScope = CoroutineScope(coroutineContext)
-    val resultScope = CoroutineScope(newCoroutineContext(coroutineContext)+CoroutineName("result#$id"))
+//    val resultScope = CoroutineScope(newCoroutineContext(Dispatchers.IO)+CoroutineName("result#$id"))
 
     val idS = coroutineName.name
-    fun println(vararg any: Any?) = idS.pppp("running",*any)
-    fun debug(vararg any: Any?) = idS.dddd("running", *any)
-    fun error(vararg any: Any?) = idS.eeee("running", *any)
+    fun warpMsg(vararg any: Any?)
+        = (any.takeIf { it.size > 1 }?.toList() ?: listOf("running",*any)).toTypedArray()
+    fun println(vararg any: Any?) = idS.pppp(*warpMsg(any))
+    fun debug(vararg any: Any?) = idS.dddd(*warpMsg(any))
+    fun error(vararg any: Any?) = idS.eeee(*warpMsg(any))
     debug("ready")
 
     val flow = MutableSharedFlow<ProcessingResults>()
+    val resultList = arrayListOf<ProcessingResults>()
 
     suspend fun emit(processingResults: ProcessingResults)
-        = flow.emit(processingResults)
+        = flow.emit(processingResults.also { debug("emit",it);resultList.add(it) })
+    debug("starting task")
+
+
+    val result = async(start = CoroutineStart.LAZY) {
+        while (resultList.last() !is ProcessingResults.Closed) Unit
+        resultList.toResult()
+    }
 
     val task: Deferred<CommandResult> = thisScope.async(
         context = coroutineContext,
         start = coroutineStart
-    ) {
-        debug("starting task")
-        val flow = flow.shareIn(this, SharingStarted.Eagerly)
-        val result = this@parent.async {
-            flow.takeWhile { it !is ProcessingResults.Closed }
-                .toList()
-                .plus(ProcessingResults.Closed)
-                .also { debug("await to list") }
-                .toResult(id)
-                .also {
-                    debug("result converted")
-//                    resultScope.cancel()
-                }
-        }
-
+    ) task@ {
         suspend fun endWithError(reason:String,code:Int) {
             emit(ProcessingResults.Error(reason))
             emit(ProcessingResults.CODE(code))
             emit(ProcessingResults.Closed)
-
         }
         runCatching {
             debug("building runner")
@@ -209,15 +203,20 @@ suspend fun shell(
             }
         }
         debug("main-line","waiting")
-        result.await()
+        return@task result.await()
             .also { debug("main-line","got result") }
     }
-    val resultFlow = flow.shareIn(resultScope, SharingStarted.Lazily)
     debug("main-line","result flow build")
     return@parent (object :
-        Flow<ProcessingResults> by resultFlow,
-        Deferred<CommandResult> by task,
-        KShell {}
+        Flow<ProcessingResults> by flow,
+        Deferred<CommandResult> by result,
+        KShell {
+            override suspend fun collect(collector: FlowCollector<ProcessingResults>) {
+                flow.takeWhile { it !is ProcessingResults.Closed }.collect(collector)
+                collector.emit(ProcessingResults.Closed)
+            }
+
+    }
     ).also { debug("main-line","return") }
 }
 
