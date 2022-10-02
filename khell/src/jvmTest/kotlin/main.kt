@@ -1,5 +1,8 @@
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import me.heizi.kotlinx.shell.Shell
+import me.heizi.kotlinx.shell.keepCLIPrefix
 import me.heizi.kotlinx.shell.shell
 import kotlin.test.Test
 
@@ -14,18 +17,32 @@ operator fun String.not() {
 
 suspend fun main() {
     !"start"
+//    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
+//        run("ping baidu.com")
+//    }.await()
+//    !"old shell ping"
+//    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
+//        run("ping baidu.com")
+//    }.await()
+//    !"new shell ping"
     repeat(3) {
-        shell {
-            run("echo heizi")
-        }.await()
+        coroutineScope {
+            launch {
+                val shell = shell(prefix = keepCLIPrefix) {
+                    run("echo heizi")
+                }
+                println("out-line")
+                shell.await().let(::println)
+            }
+        }
     }
     !"shell"
-    repeat(3) {
-        Shell {
+    repeat(3,) {
+        Shell(prefix = keepCLIPrefix) {
             run("echo heizi")
         }.await()
     }
-    !"Start"
+    !"end"
 }
 
 class Branch {

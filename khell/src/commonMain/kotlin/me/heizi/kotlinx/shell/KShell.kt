@@ -7,6 +7,7 @@ import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
 import me.heizi.kotlinx.shell.WriterRunScope.Companion.getDefaultRunScope
 import java.io.BufferedInputStream
 import java.io.IOException
+import java.io.InputStream
 import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
 import me.heizi.kotlinx.logger.debug as dddd
@@ -24,35 +25,44 @@ suspend fun shell(
     env: Map<String, String>? = null,
     isMixingMessage: Boolean = false,
     isEcho: Boolean = false,
-    coroutineStart: CoroutineStart = CoroutineStart.LAZY,
+    coroutineStart: CoroutineStart = CoroutineStart.DEFAULT,
     id: Int = Shell.idMaker++,
     charset: Charset = defaultCharset,
     onRun: suspend RunScope.() -> Unit,
-): KShell = coroutineScope {
+): KShell = coroutineScope  parent@{
 
     val coroutineName = CoroutineName("shell-worker#$id")
     val coroutineContext = newCoroutineContext(coroutineContext)+coroutineName
+    val thisScope = CoroutineScope(coroutineContext)
+    val resultScope = CoroutineScope(newCoroutineContext(coroutineContext)+CoroutineName("result#$id"))
 
-    val idS = coroutineName.toString()
+    val idS = coroutineName.name
     fun println(vararg any: Any?) = idS.pppp("running",*any)
     fun debug(vararg any: Any?) = idS.dddd("running", *any)
     fun error(vararg any: Any?) = idS.eeee("running", *any)
+    debug("ready")
 
     val flow = MutableSharedFlow<ProcessingResults>()
+
     suspend fun emit(processingResults: ProcessingResults)
         = flow.emit(processingResults)
 
-    val task: Deferred<CommandResult> = async(
+    val task: Deferred<CommandResult> = thisScope.async(
         context = coroutineContext,
         start = coroutineStart
     ) {
+        debug("starting task")
         val flow = flow.shareIn(this, SharingStarted.Eagerly)
-        val result = async {
+        val result = this@parent.async {
             flow.takeWhile { it !is ProcessingResults.Closed }
                 .toList()
+                .plus(ProcessingResults.Closed)
                 .also { debug("await to list") }
                 .toResult(id)
-                .also { debug("result converted") }
+                .also {
+                    debug("result converted")
+//                    resultScope.cancel()
+                }
         }
 
         suspend fun endWithError(reason:String,code:Int) {
@@ -72,33 +82,40 @@ suspend fun shell(
             }.let { p ->
                 require(p!=null) { "process is not even running" }
                 val readJob = launch {
-                    suspend fun BufferedInputStream.readAwait(): Pair<Boolean, ByteArray> {
+                    debug("read","start")
+                    suspend fun InputStream.readAwait(): Pair<Boolean, ByteArray> {
                         val bytes = ByteArray(DEFAULT_BUFFER_SIZE)
-                        return (read(bytes) != -1) to bytes
+                        return runCatching { (read(bytes) != -1) }.getOrDefault(false) to bytes
                     }
-                    suspend fun BufferedInputStream.readAsFlow()= flow {
+                    suspend fun InputStream.readAsFlow()= flow {
                         do {
                             val (keep,bytes) = readAwait()
-                            emit(bytes)
+                            if (bytes.isBlank()) continue else emit(bytes)
                         } while (keep)
                     }
                     fun Flow<ByteArray>.mapToString()
                         = map { String(it,charset) }
-                    suspend fun BufferedInputStream.readAndEmit(block:((String)->ProcessingResults)) {
+                    suspend fun InputStream.readAndEmit(block:((String)->ProcessingResults)) {
                         readAsFlow()
                             .mapToString()
                             .map(block)
                             .collect(::emit)
                     }
                     launch {
+                        debug("read","input")
+//                        debug(p.inputStream.bufferedReader(charset).use { it.readText() })
                         p.inputStream.buffered().use {
+                            debug(it.bufferedReader(charset).readLines())
                             it.readAndEmit { s ->
                                 println("message", s)
                                 ProcessingResults.Message(s)
                             }
                         }
+
                     }
-                    launch {
+                    if (!isMixingMessage) launch {
+                        debug("read","error")
+                        debug(p.errorStream.bufferedReader(charset).use { it.readText() })
                         p.errorStream.buffered().use {
                             it.readAndEmit { s ->
                                 error("error", s)
@@ -106,6 +123,9 @@ suspend fun shell(
                             }
                         }
                     }
+                    debug("wait","code")
+                    emit(ProcessingResults.CODE(p.waitFor()))
+                    debug("join","read")
                     joinAll()
 //
 //                    var inputJob:Job? = null
@@ -136,20 +156,21 @@ suspend fun shell(
 //                            println("message", p)
 //                        }
 //                    }
-                    println("read task done")
+                    println("read","end")
 //                    runCatching {
 //                        input.close()
 //                        error.close()
 //                    }
                 }.also { job -> job.invokeOnCompletion { e->
-                    println("closing read stream")
+                    println("read","join")
                     runCatching {
                         p.errorStream.close()
                         p.inputStream.close()
                     }
                 }}
 
-                val writeJob = launch(coroutineContext) {
+                val writeJob = launch {
+                    debug("write","start")
                     p.outputStream.writer(charset).use {
                         it.getDefaultRunScope(isEcho,id).let { s ->
                             debug("writing")
@@ -157,14 +178,16 @@ suspend fun shell(
                         }
                     }
                 }.also { it.invokeOnCompletion {
-                    println("closing write stream")
-                    p.outputStream.close()
+                    println("write","join")
+                    runCatching {
+                        p.outputStream.close()
+                    }
                 } }
-                val flow = flow.shareIn(this, SharingStarted.Eagerly)
-                    .takeWhile { it !is ProcessingResults.Closed }
-                debug("joins the jobs")
+                debug("join","jobs")
                 writeJob.join()
                 readJob.join()
+                debug("close","emit")
+                emit(ProcessingResults.Closed)
             }
         }.onFailure { e->
             when {
@@ -185,10 +208,24 @@ suspend fun shell(
                 } else -> endWithError(reason = e.toString(),-1)
             }
         }
+        debug("main-line","waiting")
         result.await()
+            .also { debug("main-line","got result") }
     }
-    return@coroutineScope object :
-        Flow<ProcessingResults> by flow.shareIn(this, SharingStarted.Eagerly),
+    val resultFlow = flow.shareIn(resultScope, SharingStarted.Lazily)
+    debug("main-line","result flow build")
+    return@parent (object :
+        Flow<ProcessingResults> by resultFlow,
         Deferred<CommandResult> by task,
         KShell {}
+    ).also { debug("main-line","return") }
+}
+
+private fun ByteArray.isBlank(): Boolean {
+    for (i in this) {
+        if (i != 0.toByte()) {
+            return false
+        }
+    }
+    return true
 }
