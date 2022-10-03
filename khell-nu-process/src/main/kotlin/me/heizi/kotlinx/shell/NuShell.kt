@@ -23,16 +23,6 @@ import me.heizi.kotlinx.logger.debug as dddd
 import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
-@OptIn(InternalCoroutinesApi::class)
-class ReOpenNuShell(override val coroutineContext: CoroutineContext, ):
-    AbstractCoroutine<CommandResult>(coroutineContext, false, false) {
-    override fun onStart() {
-        super.onStart()
-    }
-    inner class MuHandler
-
-}
-
 /**
  * ## NuShell - NuProcess的封装类
  * Create and run a [NuProcess] by command line , that's Shell no matter is Windows call it or not .

@@ -1,11 +1,7 @@
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import me.heizi.kotlinx.shell.NuShell
-import me.heizi.kotlinx.shell.Shell
-import me.heizi.kotlinx.shell.keepCLIPrefix
-import me.heizi.kotlinx.shell.shell
+import kotlinx.coroutines.*
+import kotlinx.coroutines.debug.DebugProbes
+import me.heizi.kotlinx.logger.debug
+import me.heizi.kotlinx.shell.*
 import java.util.LinkedList
 import kotlin.test.Test
 
@@ -22,7 +18,9 @@ inline operator fun String.not() {
 }
 
 
-suspend fun main() {
+@OptIn(ExperimentalCoroutinesApi::class)
+suspend fun main() = coroutineScope {
+    DebugProbes.install()
     println(System.getProperty("com.zaxxer.nuprocess.threads", "auto"))
     !"start"
 //    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
@@ -45,9 +43,9 @@ suspend fun main() {
 //    }
 //    !"nu shell"
     repeat(times,) {
-        NuShell(prefix = keepCLIPrefix) {
-            run("echo heizi")
-        }.await()
+        DebugProbes.dumpCoroutines()
+        ReOpenNuShell(prefix = arrayOf("cmd","/c","echo heizi"),coroutineContext+Dispatchers.IO) {
+        }.join()
     }
     !"shell"
 //    repeat(times,) {

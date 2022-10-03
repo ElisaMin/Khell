@@ -14,6 +14,7 @@ dependencies {
     testImplementation("org.slf4j:slf4j-log4j12:${rootProject.versions["slf4j"]}")
     testImplementation(kotlin("test"))
     testImplementation(project(":khell"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-debug:${rootProject.versions["coroutine"]}")
 }
 repositories {
     mavenCentral()
