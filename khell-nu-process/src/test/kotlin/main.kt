@@ -23,6 +23,7 @@ inline operator fun String.not() {
 
 
 suspend fun main() {
+    println(System.getProperty("com.zaxxer.nuprocess.threads", "auto"))
     !"start"
 //    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
 //        run("ping baidu.com")

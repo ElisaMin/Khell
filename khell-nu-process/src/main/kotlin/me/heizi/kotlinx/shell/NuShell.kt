@@ -23,6 +23,16 @@ import me.heizi.kotlinx.logger.debug as dddd
 import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
+@OptIn(InternalCoroutinesApi::class)
+class ReOpenNuShell(override val coroutineContext: CoroutineContext, ):
+    AbstractCoroutine<CommandResult>(coroutineContext, false, false) {
+    override fun onStart() {
+        super.onStart()
+    }
+    inner class MuHandler
+
+}
+
 /**
  * ## NuShell - NuProcess的封装类
  * Create and run a [NuProcess] by command line , that's Shell no matter is Windows call it or not .
@@ -55,92 +65,14 @@ class NuShell constructor(
     private val onRun: suspend RunScope.() -> Unit,
 ): AbstractKShell(coroutineContext, prefix, env, isMixingMessage, isEcho, startWithCreate, id, charset, onRun) {
 
-    private val idS = "shell#${id}"
-    private fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
-    private fun debug(vararg any: Any?) = idS.dddd("running", *any)
-    private fun error(vararg any: Any?) = idS.eeee("running", *any)
-
-    private val block:suspend CoroutineScope.()->CommandResult = {
-        run()
-        debug("block returning")
-        result!!
-    }
-    private val continuation = block.createCoroutineUnintercepted(this, this)
-    private val collectors = arrayListOf<FlowCollector<ProcessingResults>>()
     private var result:CommandResult? = null
-
-    private val replayCache: ArrayList<ProcessingResults> = arrayListOf()
-    private val nuHandler = object : NuAbstractCharsetHandler(charset) {
-
-        val sb = StringBuilder()
-
-        var nuProcess:NuProcess? = null
-
-        init {
-
-            launch {
-                while (nuProcess==null) Unit
-                val runner = object : RunScope {
-                    override fun run(command: String) {
-                        sb.append(command)
-                        nuProcess!!.wantWrite()
-                    }
-                }
-                onRun(runner)
-                runner.run("\n\nexit")
-            }
-        }
-
-        override fun onStart(nuProcess: NuProcess) {
-            this.nuProcess = nuProcess
-        }
-        override fun onExit(exitCode: Int) { runBlocking {
-
-            emit(ProcessingResults.CODE(exitCode))
-            close()
-        } }
-        override fun onStdinCharsReady(buffer: CharBuffer): Boolean = runBlocking {
-            var command:String = sb.toString()
-            sb.clear()
-            command = if (isEcho) "echo \"$command\"\n$command\n" else "$command\n"
-            command += "\n"
-            this@NuShell.debug("stdin",command.split("\n"))
-            buffer.put(command)
-            buffer.flip()
-            false
-        }
-        fun emit(buffer: CharBuffer,isError: Boolean = false) = runBlocking {
-            emit(buildString {
-                while (buffer.hasRemaining())
-                    append(buffer.get())
-            } .also {
-                if (isError) error("stderr",it) else println("stdout",it)
-            }.let(if (!isMixingMessage && isError) ProcessingResults::Error else ProcessingResults::Message))
-         }
-
-        override fun onStderrChars(buffer: CharBuffer, closed: Boolean, coderResult: CoderResult?)
-            = emit(buffer,true)
-        override fun onStdoutChars(buffer: CharBuffer, closed: Boolean, coderResult: CoderResult?)
-            = emit(buffer,false)
-    }
-
-    private suspend fun close() {
-        process?.run {
-            if (isRunning) {
-                waitFor(0,TimeUnit.NANOSECONDS)
-                destroy(false)
-            }
-        }
-        debug("all closed")
-        emit(ProcessingResults.Closed)
-        debug("emit closed")
-    }
 
     private val process by lazy {
         runCatching {
+            debug("runner","building")
             NuProcessBuilder(nuHandler,*prefix).run {
                 env?.let { environment().putAll(it) }
-                start()
+                start().also { println("runner","built") }
             }
         }.onFailure {e ->
             fun endWithError(reason:String,code:Int = -1) = runBlocking {
@@ -166,6 +98,48 @@ class NuShell constructor(
                 } else -> null
             } ?: endWithError(e.message?:e.toString(),)
         }.getOrNull()
+    }
+    private val nuHandler by lazy {
+        create()
+    }
+    private val block:suspend CoroutineScope.()->CommandResult = {
+        debug("building runner")
+        require(process!=null) {
+            "process is not even running"
+        }
+        debug("runner","await")
+        var isRunningStill = true
+        launch {
+            var i=0
+            while (isRunningStill) {
+                kotlin.io.println("running${i++}")
+                delay(1000)
+            }
+        }
+        process!!.waitFor(0,TimeUnit.NANOSECONDS)
+        isRunningStill = false
+        close()
+        this@NuShell.debug("block returning")
+        result!!
+    }
+    private val continuation = block.createCoroutineUnintercepted(this, this)
+
+    private val collectors = arrayListOf<FlowCollector<ProcessingResults>>()
+
+    private val replayCache: ArrayList<ProcessingResults> = arrayListOf()
+
+
+    private suspend fun close() {
+        process?.run {
+            if (isRunning) {
+                waitFor(0,TimeUnit.NANOSECONDS)
+                destroy(false)
+            }
+        }
+        debug("all closed")
+        emit(ProcessingResults.Closed)
+        debug("emit closed")
+        cancel()
     }
 
     override fun onStart() {
@@ -193,15 +167,56 @@ class NuShell constructor(
 
     private val newIOContext get() = coroutineContext.newCoroutineContext(IO)
 
-    private suspend inline fun run()  {
-        debug("building runner")
-        require(process!=null) {
-            "process is not even running"
+    private fun create()  = object : NuAbstractCharsetHandler(charset) {
+
+        val sb = StringBuilder()
+
+        var nuProcess:NuProcess? = null
+
+        init {
+            launch {
+                while (nuProcess==null) Unit
+                val runner = object : RunScope {
+                    override fun run(command: String) {
+                        sb.append(command)
+                        nuProcess!!.wantWrite()
+                    }
+                }
+                onRun(runner)
+                runner.run("\n\nexit")
+            }
         }
-        val process = this.process!!
-        debug("runner bullied")
-        process.waitFor(0,TimeUnit.NANOSECONDS)
-        close()
+
+        override fun onStart(nuProcess: NuProcess) {
+            this.nuProcess = nuProcess
+        }
+        override fun onExit(exitCode: Int) { runBlocking {
+            emit(ProcessingResults.CODE(exitCode))
+            close()
+        } }
+        override fun onStdinCharsReady(buffer: CharBuffer): Boolean = runBlocking {
+            var command:String = sb.toString()
+            sb.clear()
+            command = if (isEcho) "echo \"$command\"\n$command\n" else "$command\n"
+            command += "\n"
+            this@NuShell.debug("stdin",command.split("\n"))
+            buffer.put(command)
+            buffer.flip()
+            false
+        }
+        fun emit(buffer: CharBuffer,isError: Boolean = false) = runBlocking {
+            emit(buildString {
+                while (buffer.hasRemaining())
+                    append(buffer.get())
+            }.lines().filter{it.isNotBlank()}.joinToString("\n").also {
+                if (isError) error("stderr",it) else println("stdout",it)
+            }.let(if (!isMixingMessage && isError) ProcessingResults::Error else ProcessingResults::Message))
+        }
+
+        override fun onStderrChars(buffer: CharBuffer, closed: Boolean, coderResult: CoderResult?)
+                = emit(buffer,true)
+        override fun onStdoutChars(buffer: CharBuffer, closed: Boolean, coderResult: CoderResult?)
+                = emit(buffer,false)
     }
 
 
@@ -227,6 +242,10 @@ class NuShell constructor(
     override fun getCompleted(): CommandResult {
         return result!!
     }
+    private val idS = "shell#${id}"
+    private fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
+    private fun debug(vararg any: Any?) = idS.dddd("running", *any)
+    private fun error(vararg any: Any?) = idS.eeee("running", *any)
 
     /**
      * FIXME:永远不可能修复了估计,来个大佬吧
