@@ -2,6 +2,7 @@ package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import me.heizi.kotlinx.shell.AbstractKShell.Companion.getNewId
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
 import me.heizi.kotlinx.shell.Shell.Companion.exceptionRegex
 import java.io.IOException
@@ -25,7 +26,7 @@ suspend fun shell(
     isMixingMessage: Boolean = false,
     isEcho: Boolean = false,
     coroutineStart: CoroutineStart = CoroutineStart.DEFAULT,
-    id: Int = Shell.idMaker++,
+    id: Int = getNewId(),
     charset: Charset = defaultCharset,
     onRun: suspend RunScope.() -> Unit,
 ): KShell = coroutineScope  parent@{

@@ -9,6 +9,7 @@ pluginManagement {
     plugins {
         id("com.android.library").version(extra["agp.version"] as String)
         kotlin("multiplatform").version(extra["kotlin.version"] as String)
+        kotlin("jvm").version(extra["kotlin.version"] as String)
 
     }
 }
@@ -19,3 +20,4 @@ rootProject.name = "Khell"
 include("khell-log")
 include("khell-api")
 include("khell")
+include("khell-nu-process")
