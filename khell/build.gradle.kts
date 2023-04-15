@@ -12,6 +12,9 @@ kotlin {
     }
     sourceSets {
         commonMain {
+            kotlin {
+                jvmToolchain(Runtime.version().feature())
+            }
             dependencies {
                 api(project(":khell-log"))
                 implementation(project(":khell-api"))

@@ -7,7 +7,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.internal.resumeCancellableWith
 import kotlinx.coroutines.selects.SelectClause1
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
+import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -16,8 +18,6 @@ import kotlin.coroutines.intrinsics.intercepted
 import me.heizi.kotlinx.logger.debug as dddd
 import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
-
-
 
 
 /**
@@ -48,16 +48,141 @@ class Shell(
     startWithCreate: Boolean = true,
     id: Int = getNewId(),
     private val charset: Charset = defaultCharset,
+    private val workdir: File? = null,
     private val onRun: suspend RunScope.() -> Unit,
-): AbstractKShell(coroutineContext, prefix, env, isMixingMessage, isEcho, startWithCreate, id, charset, onRun) {
+): AbstractKShell(coroutineContext, prefix, env, isMixingMessage, isEcho, startWithCreate, id, charset,workdir, onRun) {
 
     private val idS = "shell#${id}"
     private fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
     private fun debug(vararg any: Any?) = idS.dddd("running", *any)
     private fun error(vararg any: Any?) = idS.eeee("running", *any)
 
+    private fun create() = ProcessBuilder(*prefix).apply {
+        if (isMixingMessage) this.redirectErrorStream(true)
+        workdir?.let(this::directory)
+        env?.takeIf { it.isNotEmpty() }?.let {
+            val e = environment()
+            e.putAll(it)
+        }
+    }.start()
+
+    private suspend fun collectErrJob() = coroutineScope {
+        launch(newIOContext) {
+            debug("collecting err")
+            stdErrRead(process!!.errorStream)
+        }
+    }
+    private suspend fun collectOutJob() = coroutineScope {
+        launch(newIOContext) {
+            debug("collecting out")
+            stdOutRead(process!!.inputStream)
+        }
+    }
+    private suspend fun writeJob() = coroutineScope {
+        launch(newIOContext) {
+            process!!.outputStream.writer(charset).getDefaultRunScope(isEcho, id).let {
+                debug("writing")
+                onRun(it)
+            }
+        }
+    }
+    private suspend inline fun runJobInside() = coroutineScope {
+        debug("building runner")
+        require(process!=null) {
+            "process is not even running"
+        }
+        debug("runner bullied")
+        collectOutJob()
+        //如果混合消息则直接跳过这次的collect
+        if (!isMixingMessage) collectErrJob()
+        writeJob().invokeOnCompletion {error->
+            error?.let {
+                debug("write job failed",it)
+                process!!.outputStream.close()
+            }
+        }
+        val code = withContext(IO) {
+            process!!.waitFor()
+        }
+        debug("process exit with code $code")
+//        this.coroutineContext.job.join()
+        debug("all job joined")
+        runCatching { process!!.destroy() }
+        debug("process destroyed")
+        emit(ProcessingResults.CODE(code))
+        close()
+        debug("emit closed")
+        debug("run out")
+    }
+
+    private suspend fun lastMsg(msg:String?,code:Int = -1){
+        msg?.let {
+            emit(ProcessingResults.Error(it))
+        }
+        emit(ProcessingResults.CODE(code))
+        close()
+    }
+    private suspend fun close()  {
+        emit(ProcessingResults.Closed)
+    }
+
+    private suspend inline fun read(stream:InputStream,crossinline onLine:suspend (String)->Unit) {
+//        debug("reading")
+        stream.bufferedReader(charset).useLines { it.forEach { line ->
+            onLine(line)
+        } }
+    }
+    private suspend fun stdErrRead(stream:InputStream) = read(stream) {
+        error("failed", it)
+        emit(ProcessingResults.Error(it))
+    }
+    private suspend fun stdOutRead(stream:InputStream) = read(stream) {
+        debug("message", it)
+        emit(ProcessingResults.Message(it))
+    }
+    private suspend fun handlingProcessError(error: Throwable) = when {
+        error is IOException && error.message!=null -> {
+            println("catch IO exception \n $error")
+            val msg = error.message!!
+            when {
+                msg.matches(exceptionRegex) -> {
+                    //["114514","message"]
+                    exceptionRegex.find(msg)!!
+                        .groupValues
+                        .takeIf { it.size > 1 }
+                        ?.let { lastMsg(it[2], it[1].toInt()) }
+
+                }
+                "error=" in msg -> {
+                    //["cannot run xxxx","114514,message"]
+                    msg.split("error=")[1]
+                        .split(",")
+                        .takeIf { it.size > 1 }
+                        ?.let { lastMsg(it[2], it[1].toInt()) }
+                }
+                else -> {
+                    lastMsg(msg)
+                }
+            }
+            close()
+        }
+        else -> {
+            lastMsg(error.toString())
+        }
+    }
+    private val process by lazy {
+        runCatching {
+            create()
+        }.onFailure { runBlocking {
+            handlingProcessError(it)
+        } }
+            .getOrNull()
+    }
+
+
+
     private val block:suspend CoroutineScope.()->CommandResult = {
-        run()
+        runJobInside()
         debug("block returning")
         result!!
     }
@@ -66,54 +191,15 @@ class Shell(
     private var result:CommandResult? = null
 
     private val replayCache: ArrayList<ProcessingResults> = arrayListOf()
-    private val process by lazy {
-        runCatching {
-            ProcessBuilder(*prefix).run {
-//                environment().putAll(Khell.env)
-                env?.let { environment().putAll(it) }
-                if (isMixingMessage) this.redirectErrorStream(true)
-                start()
-            }
-        }.onFailure { e->
-            when {
-                e is IOException && e.message!=null ->{
-                    println("catch IO exception \n $e")
-                    val msg = e.message!!
-                    when {
-                        msg.matches(exceptionRegex) -> {
-                            runBlocking {
-                                exceptionRegex.find(msg)!!.groupValues.let {
-                                    emit(ProcessingResults.Error(it[2]))
-                                    emit(ProcessingResults.CODE(it[1].toInt()))
-                                    emit(ProcessingResults.Closed)
-                                }
-                            }
-                        }
-                        "error=" in msg -> {
-                            //["cannot run xxxx","114514,message"]
-                            msg.split("error=")[1].split(",").let {
-
-                                runBlocking {
-                                    //["114514","message"]
-                                    emit(ProcessingResults.Error(it[1]))
-                                    emit(ProcessingResults.CODE(it[0].toInt()))
-                                    emit(ProcessingResults.Closed)
-                                }
-                            }
-                        }
-                        else -> Unit
-                    }
-                }
-            }
-        }.getOrNull()
-    }
 
     override fun onStart() {
         try {
             continuation.intercepted().resumeCancellableWith(Result.success(Unit))
             debug("resumed")
         }catch (e:Exception) {
-            error("$e")
+            runBlocking {
+                handlingProcessError(e)
+            }
         }
     }
 
@@ -132,57 +218,6 @@ class Shell(
     }
 
     private val newIOContext get() = coroutineContext.newCoroutineContext(IO)
-
-    private suspend inline fun run()  {
-        debug("building runner")
-        require(process!=null) {
-            "process is not even running"
-        }
-
-        val process = this.process!!
-        debug("runner bullied")
-
-        val msgJob = launch(newIOContext) {
-            process.inputStream.bufferedReader(charset).lineSequence().forEach {
-                emit(ProcessingResults.Message(it))
-                println("message", it)
-            }
-        }
-        //如果混合消息则直接跳过这次的collect
-        val errJob = if (!isMixingMessage) launch(newIOContext) {
-            process.errorStream.bufferedReader(charset).lineSequence().forEach {
-                emit(ProcessingResults.Error(it))
-                error("failed", it)
-            }
-        } else null
-        val writeJob = launch(newIOContext) {
-            process.outputStream.writer(charset).getDefaultRunScope(isEcho,id).let {
-                debug("writing")
-                onRun(it)
-            }
-        }
-        writeJob.invokeOnCompletion {
-            process.outputStream.runCatching { close() }
-        }
-        launch (IO) {
-            writeJob.join()
-            errJob?.join()
-            msgJob.join()
-            emit(ProcessingResults.CODE(process.waitFor()))
-            println("exiting")
-            process.runCatching {
-                inputStream.close()
-                errorStream.close()
-                destroy()
-            }.onFailure {
-                debug(it)
-            }
-            debug("all closed")
-            emit(ProcessingResults.Closed)
-            debug("emit closed")
-        }.join()
-        debug("run out")
-    }
 
 
     override suspend fun collect(collector: FlowCollector<ProcessingResults>) {

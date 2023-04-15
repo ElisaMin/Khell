@@ -1,6 +1,7 @@
 package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
+import java.io.File
 import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -18,6 +19,7 @@ abstract class AbstractKShell(
     startWithCreate: Boolean = true,
     val id: Int = getNewId(),
     private val charset: Charset,
+    private val workdir: File? = null,
     private val onRun: suspend RunScope.() -> Unit,
 ): KShell,
     CoroutineScope by CoroutineScope(coroutineContext+CoroutineName("shell-worker#$id")),

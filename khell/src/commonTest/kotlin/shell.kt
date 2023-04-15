@@ -4,7 +4,7 @@ import me.heizi.kotlinx.shell.Shell
 import kotlin.test.Test
 
 class CommonTest {
-//    @Test
+    @Test
     fun echoHelloWorld () = runBlocking {
         if (System.getProperty("os.name").startsWith("Windows"))
         Shell("echo hello world").await().let {
@@ -20,5 +20,8 @@ class CommonTest {
             }
 
         }
+    }
+    @Test fun `ping baidu` (): Unit = runBlocking {
+        Shell("ping baidu.com").await()
     }
 }
