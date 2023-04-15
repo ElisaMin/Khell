@@ -1,4 +1,5 @@
 import me.heizi.koltinx.version.versions
+import org.jetbrains.kotlin.ir.backend.js.compile
 
 plugins {
     kotlin("multiplatform")
@@ -14,6 +15,13 @@ kotlin {
         commonMain {
             kotlin {
                 jvmToolchain(Runtime.version().feature())
+                targets.all {
+                    compilations.all {
+                        kotlinOptions {
+                            freeCompilerArgs += "-Xcontext-receivers"
+                        }
+                    }
+                }
             }
             dependencies {
                 api(project(":khell-log"))

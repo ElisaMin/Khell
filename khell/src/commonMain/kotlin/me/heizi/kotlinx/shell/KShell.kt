@@ -1,6 +1,9 @@
+@file:Suppress("NOTHING_TO_INLINE")
 package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.flow.*
 import me.heizi.kotlinx.shell.AbstractKShell.Companion.getNewId
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
@@ -13,6 +16,53 @@ import me.heizi.kotlinx.logger.debug as dddd
 import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
+
+private typealias Results = ProducerScope<ProcessingResults>
+
+private suspend inline fun Results.handlingProcessError(error: Throwable) = when {
+    error is IOException && error.message!=null -> {
+        println("catch IO exception \n $error")
+        val msg = error.message!!
+        when {
+            msg.matches(exceptionRegex) -> {
+                //["114514","message"]
+                exceptionRegex.find(msg)!!
+                    .groupValues
+                    .takeIf { it.size > 1 }
+                    ?.let { lastMsg(it[2], it[1].toInt()) }
+
+            }
+            "error=" in msg -> {
+                //["cannot run xxxx","114514,message"]
+                msg.split("error=")[1]
+                    .split(",")
+                    .takeIf { it.size > 1 }
+                    ?.let { lastMsg(it[2], it[1].toInt()) }
+            }
+            else -> {
+                lastMsg(msg)
+            }
+        }
+        close()
+    }
+    else -> {
+        lastMsg(error.toString())
+    }
+}
+
+
+private suspend inline fun Results.emit(msg:ProcessingResults) = send(msg)
+//context()
+private suspend inline fun Results.close() = emit(ProcessingResults.Closed)
+private suspend inline fun Results.lastMsg(msg:String?,code:Int?=null) {
+    if (msg != null) emit(ProcessingResults.Message(msg))
+    emit(ProcessingResults.CODE(code?:-1))
+    close()
+}
+private suspend inline fun Results.handleException(e:Exception) {
+    emit(ProcessingResults.Error(e.message?:""))
+    close()
+}
 
 
 @Deprecated("its shit.")
@@ -44,12 +94,9 @@ suspend fun shell(
     fun error(vararg any: Any?) = idS.eeee(*warpMsg(any))
     debug("ready")
 
+
+
     val flow = channelFlow {
-        suspend fun endWithError(reason:String,code:Int) {
-            send(ProcessingResults.Error(reason))
-            send(ProcessingResults.CODE(code))
-            send(ProcessingResults.Closed)
-        }
         runCatching {
             debug("building runner")
             ProcessBuilder(*prefix).run {
@@ -74,49 +121,89 @@ suspend fun shell(
                         p.outputStream.close()
                     }
                 } }
-                val readJob = launch {
 
+
+                val readJob = launch(IO) {
+                    var stdAlive = true
+                    var errAlive = true
+                    val buffer = ByteArray(1024) { -1 }
+                    val stringBufferErr = StringBuffer()
+                    val stringBufferOut = StringBuffer()
+                    var switch = false
                     debug("read","start")
-                    suspend fun InputStream.readAwait(): Pair<Boolean, ByteArray> {
-                        val bytes = ByteArray(DEFAULT_BUFFER_SIZE)
-                        return runCatching { (read(bytes) != -1) }.getOrDefault(false) to bytes
-                    }
-                    suspend fun InputStream.readAsFlow()= flow {
-                        do {
-                            val (keep,bytes) = readAwait()
-                            if (bytes.isBlank()) continue else emit(bytes)
-                        } while (keep)
-                    }
-                    fun Flow<ByteArray>.mapToString()
-                            = map { String(it,charset) }
-                    suspend fun InputStream.readAndSend(block:((String)->ProcessingResults)) {
-                        readAsFlow()
-                            .mapToString()
-                            .map(block)
-                            .collect(::send)
-                    }
-                    launch {
-                        debug("read","input")
-//                        debug(p.inputStream.bufferedReader(charset).use { it.readText() })
-                        p.inputStream.buffered().use {
-                            debug(it.bufferedReader(charset).readLines())
-                            it.readAndSend { s ->
-                                println("message", s)
-                                ProcessingResults.Message(s)
+                    while (!stdAlive && !errAlive) {
+                        withTimeout(1) {
+                            while (true) {
+                                switch = !switch
+                                var at = 0
+                                val strBuffer= if (switch) stringBufferOut else stringBufferErr
+                                for ((i, b) in buffer.withIndex()) {
+                                    at = i
+                                    if (b == (-1).toByte()) break
+                                    stringBufferErr.append(b)
+                                    buffer[i] = -1
+                                    if (b == '\n'.code.toByte()) {
+                                        val s = if (switch) ProcessingResults.Message(strBuffer.toString()) else ProcessingResults.Error(strBuffer.toString())
+                                        println(s)
+                                        strBuffer.removeRange(0,strBuffer.length)
+                                    }
+                                }
+                                val stream = if (switch) p.inputStream else p.errorStream
+                                stream.read().takeIf { it != -1 }?.let {
+                                    buffer[at] = it.toByte()
+                                }?: if (switch) {
+                                    stdAlive = false
+                                    break
+                                } else {
+                                    errAlive = false
+                                    break
+                                }
                             }
                         }
+                    }
 
-                    }
-                    if (!isMixingMessage) launch {
-                        debug("read","error")
-                        debug(p.errorStream.bufferedReader(charset).use { it.readText() })
-                        p.errorStream.buffered().use {
-                            it.readAndSend { s ->
-                                error("error", s)
-                                ProcessingResults.Message(s)
-                            }
-                        }
-                    }
+
+//                    suspend fun InputStream.readAwait(): Pair<Boolean, ByteArray> {
+//                        val bytes = ByteArray(DEFAULT_BUFFER_SIZE)
+//                        return runCatching { (read(bytes) != -1) }.getOrDefault(false) to bytes
+//                    }
+//                    suspend fun InputStream.readAsFlow()= flow {
+//                        do {
+//                            val (keep,bytes) = readAwait()
+//                            if (bytes.isBlank()) continue else emit(bytes)
+//                        } while (keep)
+//                    }
+//                    fun Flow<ByteArray>.mapToString()
+//                            = map { String(it,charset) }
+//                    suspend fun InputStream.readAndSend(block:((String)->ProcessingResults)) {
+//                        readAsFlow()
+//                            .mapToString()
+//                            .map(block)
+//                            .collect(::send)
+//                    }
+//                    launch {
+//                        debug("read","input")
+////                        debug(p.inputStream.bufferedReader(charset).use { it.readText() })
+//                        p.inputStream.buffered().use {
+//                            debug(it.bufferedReader(charset).readLines())
+//                            it.readAndSend { s ->
+//                                println("message", s)
+//                                ProcessingResults.Message(s)
+//                            }
+//                        }
+//
+//                    }
+//                    if (!isMixingMessage) launch {
+//                        debug("read","error")
+//                        debug(p.errorStream.bufferedReader(charset).use { it.readText() })
+//                        p.errorStream.buffered().use {
+//                            it.readAndSend { s ->
+//                                error("error", s)
+//                                ProcessingResults.Message(s)
+//                            }
+//                        }
+//                    }
+
                     debug("wait","code")
                     send(ProcessingResults.CODE(p.waitFor()))
                     debug("join","read")
@@ -136,24 +223,8 @@ suspend fun shell(
                 debug("close","send")
                 send(ProcessingResults.Closed)
             }
-        }.onFailure { e->
-            when {
-                e is IOException && e.message!=null ->{
-                    println("catch IO exception \n $e")
-                    val msg = e.message!!
-                    when {
-                        msg.matches(exceptionRegex) -> exceptionRegex.find(msg)!!.groupValues.let {
-                            endWithError(it[2],it[1].toInt())
-                        }
-                        //["cannot run xxxx","114514,message"]
-                        "error=" in msg -> msg.split("error=")[1].split(",").let {
-                            //["114514","message"]
-                            endWithError(it[1],it[0].toInt())
-                        }
-                        else -> endWithError(reason = e.toString(),-1)
-                    }
-                } else -> endWithError(reason = e.toString(),-1)
-            }
+        }.onFailure {
+            this.handlingProcessError(it)
         }
         debug("main-line","waiting")
     }
