@@ -2,6 +2,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.debug.DebugProbes
 import me.heizi.kotlinx.logger.debug
 import me.heizi.kotlinx.shell.*
+import java.lang.StringBuilder
 import java.util.LinkedList
 import kotlin.test.Test
 
@@ -23,6 +24,7 @@ suspend fun main() = coroutineScope {
     DebugProbes.install()
     println(System.getProperty("com.zaxxer.nuprocess.threads", "auto"))
     !"start"
+    val a = S
 //    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
 //        run("ping baidu.com")
 //    }.await()

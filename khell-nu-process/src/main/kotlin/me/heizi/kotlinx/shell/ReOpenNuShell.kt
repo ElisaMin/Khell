@@ -4,10 +4,8 @@ import com.zaxxer.nuprocess.NuProcess
 import com.zaxxer.nuprocess.NuProcessBuilder
 import com.zaxxer.nuprocess.codec.NuAbstractCharsetHandler
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.*
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
 import java.io.IOException
 import java.nio.CharBuffer
@@ -20,6 +18,13 @@ import kotlin.coroutines.intrinsics.intercepted
 import me.heizi.kotlinx.logger.debug as dddd
 import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
+
+//suspend fun shell() = coroutineScope {
+//    channelFlow<ProcessingResults> {
+//
+//    }
+//    Unit
+//}
 
 @OptIn(InternalCoroutinesApi::class)
 class ReOpenNuShell(

@@ -44,27 +44,11 @@ suspend fun shell(
     fun error(vararg any: Any?) = idS.eeee(*warpMsg(any))
     debug("ready")
 
-    val flow = MutableSharedFlow<ProcessingResults>()
-    val resultList = arrayListOf<ProcessingResults>()
-
-    suspend fun emit(processingResults: ProcessingResults)
-        = flow.emit(processingResults.also { debug("emit",it);resultList.add(it) })
-    debug("starting task")
-
-
-    val result = async(start = CoroutineStart.LAZY) {
-        while (resultList.last() !is ProcessingResults.Closed) Unit
-        resultList.toResult()
-    }
-
-    val task: Deferred<CommandResult> = thisScope.async(
-        context = coroutineContext,
-        start = coroutineStart
-    ) task@ {
+    val flow = channelFlow {
         suspend fun endWithError(reason:String,code:Int) {
-            emit(ProcessingResults.Error(reason))
-            emit(ProcessingResults.CODE(code))
-            emit(ProcessingResults.Closed)
+            send(ProcessingResults.Error(reason))
+            send(ProcessingResults.CODE(code))
+            send(ProcessingResults.Closed)
         }
         runCatching {
             debug("building runner")
@@ -76,94 +60,6 @@ suspend fun shell(
                 p
             }.let { p ->
                 require(p!=null) { "process is not even running" }
-                val readJob = launch {
-                    debug("read","start")
-                    suspend fun InputStream.readAwait(): Pair<Boolean, ByteArray> {
-                        val bytes = ByteArray(DEFAULT_BUFFER_SIZE)
-                        return runCatching { (read(bytes) != -1) }.getOrDefault(false) to bytes
-                    }
-                    suspend fun InputStream.readAsFlow()= flow {
-                        do {
-                            val (keep,bytes) = readAwait()
-                            if (bytes.isBlank()) continue else emit(bytes)
-                        } while (keep)
-                    }
-                    fun Flow<ByteArray>.mapToString()
-                        = map { String(it,charset) }
-                    suspend fun InputStream.readAndEmit(block:((String)->ProcessingResults)) {
-                        readAsFlow()
-                            .mapToString()
-                            .map(block)
-                            .collect(::emit)
-                    }
-                    launch {
-                        debug("read","input")
-//                        debug(p.inputStream.bufferedReader(charset).use { it.readText() })
-                        p.inputStream.buffered().use {
-                            debug(it.bufferedReader(charset).readLines())
-                            it.readAndEmit { s ->
-                                println("message", s)
-                                ProcessingResults.Message(s)
-                            }
-                        }
-
-                    }
-                    if (!isMixingMessage) launch {
-                        debug("read","error")
-                        debug(p.errorStream.bufferedReader(charset).use { it.readText() })
-                        p.errorStream.buffered().use {
-                            it.readAndEmit { s ->
-                                error("error", s)
-                                ProcessingResults.Message(s)
-                            }
-                        }
-                    }
-                    debug("wait","code")
-                    emit(ProcessingResults.CODE(p.waitFor()))
-                    debug("join","read")
-                    joinAll()
-//
-//                    var inputJob:Job? = null
-//                    var errorJob:Job? = null
-//                    var labelI = 0
-//                    var labelE = if (isMixingMessage) -1 else 0
-//
-//                    val errorTask = async(Dispatchers.IO) {
-//                        error.readAwait()
-//                    }
-
-//                    while (labelI!=-1&&labelE!=-1) {
-//                        inputJob?.join()
-//                        //block error
-//                        errorJob?.join()
-//                        errorJob = if (labelE==-1) null else launch(Dispatchers.IO) {
-//
-//                            // waiting error
-//                            val bytes = ByteArray(DEFAULT_BUFFER_SIZE)
-//                            labelE = error.read(bytes)
-//                            emit(ProcessingResults.Error(String(bytes,charset)))
-//                            error("error", p)
-//                        }
-//                        inputJob = if (labelI==-1) null else launch(Dispatchers.IO) {
-//                            val bytes = ByteArray(DEFAULT_BUFFER_SIZE)
-//                            labelI = input.read(bytes)
-//                            emit(ProcessingResults.Message(String(bytes,charset)))
-//                            println("message", p)
-//                        }
-//                    }
-                    println("read","end")
-//                    runCatching {
-//                        input.close()
-//                        error.close()
-//                    }
-                }.also { job -> job.invokeOnCompletion { e->
-                    println("read","join")
-                    runCatching {
-                        p.errorStream.close()
-                        p.inputStream.close()
-                    }
-                }}
-
                 val writeJob = launch {
                     debug("write","start")
                     p.outputStream.writer(charset).use {
@@ -178,11 +74,67 @@ suspend fun shell(
                         p.outputStream.close()
                     }
                 } }
+                val readJob = launch {
+
+                    debug("read","start")
+                    suspend fun InputStream.readAwait(): Pair<Boolean, ByteArray> {
+                        val bytes = ByteArray(DEFAULT_BUFFER_SIZE)
+                        return runCatching { (read(bytes) != -1) }.getOrDefault(false) to bytes
+                    }
+                    suspend fun InputStream.readAsFlow()= flow {
+                        do {
+                            val (keep,bytes) = readAwait()
+                            if (bytes.isBlank()) continue else emit(bytes)
+                        } while (keep)
+                    }
+                    fun Flow<ByteArray>.mapToString()
+                            = map { String(it,charset) }
+                    suspend fun InputStream.readAndSend(block:((String)->ProcessingResults)) {
+                        readAsFlow()
+                            .mapToString()
+                            .map(block)
+                            .collect(::send)
+                    }
+                    launch {
+                        debug("read","input")
+//                        debug(p.inputStream.bufferedReader(charset).use { it.readText() })
+                        p.inputStream.buffered().use {
+                            debug(it.bufferedReader(charset).readLines())
+                            it.readAndSend { s ->
+                                println("message", s)
+                                ProcessingResults.Message(s)
+                            }
+                        }
+
+                    }
+                    if (!isMixingMessage) launch {
+                        debug("read","error")
+                        debug(p.errorStream.bufferedReader(charset).use { it.readText() })
+                        p.errorStream.buffered().use {
+                            it.readAndSend { s ->
+                                error("error", s)
+                                ProcessingResults.Message(s)
+                            }
+                        }
+                    }
+                    debug("wait","code")
+                    send(ProcessingResults.CODE(p.waitFor()))
+                    debug("join","read")
+                    joinAll()
+
+                    println("read","end")
+                }.also { job -> job.invokeOnCompletion { e->
+                    println("read","join")
+                    runCatching {
+                        p.errorStream.close()
+                        p.inputStream.close()
+                    }
+                }}
                 debug("join","jobs")
                 writeJob.join()
                 readJob.join()
-                debug("close","emit")
-                emit(ProcessingResults.Closed)
+                debug("close","send")
+                send(ProcessingResults.Closed)
             }
         }.onFailure { e->
             when {
@@ -204,18 +156,21 @@ suspend fun shell(
             }
         }
         debug("main-line","waiting")
-        return@task result.await()
-            .also { debug("main-line","got result") }
     }
+
+    val result = async(start = coroutineStart) {
+        flow.toList().toResult(id)
+    }
+
     debug("main-line","result flow build")
     return@parent (object :
-        Flow<ProcessingResults> by flow,
+        Flow<ProcessingResults> by flow.shareIn(CoroutineScope(coroutineContext), started = SharingStarted.Lazily),
         Deferred<CommandResult> by result,
         KShell {
-            override suspend fun collect(collector: FlowCollector<ProcessingResults>) {
-                flow.takeWhile { it !is ProcessingResults.Closed }.collect(collector)
-                collector.emit(ProcessingResults.Closed)
-            }
+//            override suspend fun collect(collector: FlowCollector<ProcessingResults>) {
+//                flow.takeWhile { it !is ProcessingResults.Closed }.collect(collector)
+//                collector.emit(ProcessingResults.Closed)
+//            }
 
     }
     ).also { debug("main-line","return") }

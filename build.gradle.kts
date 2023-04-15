@@ -18,12 +18,15 @@ subprojects {
     apply( plugin =  "org.jetbrains.kotlin." +
             if (name!="khell-nu-process") "multiplatform" else  "jvm")
 
-    configure<PublishingExtension> {
-
-        val local = rootProject.props["local"]
+    val local = when {
+        rootProject.file("local.properties").exists() -> rootProject.props["local"]["maven_repo_dir"] as String?
+        System.getenv("LOCAL_MAVEN_REPO_DIR") != null -> System.getenv("LOCAL_MAVEN_REPO_DIR")
+        else -> null
+    }
+    local?.let { configure<PublishingExtension> {
         repositories {
             maven {
-                url = uri(local["maven_repo_dir"] as String)
+                url = uri(it)
             }
         }
         publications {
@@ -33,7 +36,7 @@ subprojects {
                 from(components["kotlin"])
             }
         }
-    }
+    } }
 
 }
 

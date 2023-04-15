@@ -1,3 +1,4 @@
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -17,17 +18,17 @@ operator fun String.not() {
 
 suspend fun main() {
     !"start"
-    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
-        run("ping baidu.com")
-    }.await()
+//    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
+//        run("ping baidu.com")
+//    }.await()
     !"old shell ping"
-    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
+    shell(coroutineStart = CoroutineStart.DEFAULT, prefix = keepCLIPrefix) {
         run("ping baidu.com")
     }.await()
     !"new shell ping"
     repeat(3) {
 
-        shell(prefix = keepCLIPrefix) {
+        shell(prefix = keepCLIPrefix,) {
             run("echo heizi")
         }.await()
 

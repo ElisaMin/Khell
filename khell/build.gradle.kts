@@ -34,11 +34,11 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:${versions["coroutine"]}")
             }
         }
-        val androidTest by getting {
-            dependencies {
-                implementation ("androidx.test.ext:junit:1.1.3")
-            }
-        }
+//        val androidTest by getting {
+//            dependencies {
+//                implementation ("androidx.test.ext:junit:1.1.3")
+//            }
+//        }
 
     }
 }
