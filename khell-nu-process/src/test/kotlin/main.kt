@@ -1,6 +1,7 @@
 import kotlinx.coroutines.*
 import kotlinx.coroutines.debug.DebugProbes
 import me.heizi.kotlinx.logger.debug
+import me.heizi.kotlinx.logger.println
 import me.heizi.kotlinx.shell.*
 import java.lang.StringBuilder
 import java.util.LinkedList
@@ -24,7 +25,7 @@ suspend fun main() = coroutineScope {
     DebugProbes.install()
     println(System.getProperty("com.zaxxer.nuprocess.threads", "auto"))
     !"start"
-    val a = S
+//    val a = S
 //    Shell(startWithCreate = true, prefix = keepCLIPrefix) {
 //        run("ping baidu.com")
 //    }.await()
@@ -46,7 +47,7 @@ suspend fun main() = coroutineScope {
 //    !"nu shell"
     repeat(times,) {
         DebugProbes.dumpCoroutines()
-        ReOpenNuShell(prefix = arrayOf("cmd","/c","echo heizi"),coroutineContext+Dispatchers.IO) {
+        NuShell(prefix = arrayOf("cmd","/c","echo heizi")) {
         }.join()
     }
     !"shell"
@@ -63,5 +64,18 @@ class Branch {
     @Test
     fun loop3() = runBlocking {
         main()
+    }
+    @Test
+    fun test() = runBlocking {
+        println("haha")
+        debug("haha")
+//        Shell( "echo heizi").collect {
+//            println(it)
+//        }
+        NuShell(prefix = arrayOf("cmd","/c","echo heizi"))
+            .apply { start() }
+            .collect {
+            println(it)
+        }
     }
 }

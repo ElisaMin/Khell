@@ -2,21 +2,12 @@ package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.internal.resumeCancellableWith
-import kotlinx.coroutines.selects.SelectClause1
-import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
 import java.io.File
-import java.io.IOException
 import java.io.InputStream
 import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.intrinsics.createCoroutineUnintercepted
-import kotlin.coroutines.intrinsics.intercepted
-import me.heizi.kotlinx.logger.debug as dddd
-import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
 
@@ -52,10 +43,14 @@ class Shell(
     private val onRun: suspend RunScope.() -> Unit,
 ): AbstractKShell(coroutineContext, prefix, env, isMixingMessage, isEcho, startWithCreate, id, charset,workdir, onRun) {
 
-    private val idS = "shell#${id}"
-    private fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
-    private fun debug(vararg any: Any?) = idS.dddd("running", *any)
-    private fun error(vararg any: Any?) = idS.eeee("running", *any)
+
+    private val process by lazy {
+        runCatching {
+            create()
+        }.onFailure {
+            handlingProcessError(it)
+        }.getOrNull()
+    }
 
     private fun create() = ProcessBuilder(*prefix).apply {
         if (isMixingMessage) this.redirectErrorStream(true)
@@ -115,151 +110,26 @@ class Shell(
         debug("run out")
     }
 
-    private suspend fun lastMsg(msg:String?,code:Int = -1){
-        msg?.let {
-            emit(ProcessingResults.Error(it))
-        }
-        emit(ProcessingResults.CODE(code))
-        close()
-    }
-    private suspend fun close()  {
-        emit(ProcessingResults.Closed)
-    }
-
     private suspend inline fun read(stream:InputStream,crossinline onLine:suspend (String)->Unit) {
-//        debug("reading")
         stream.bufferedReader(charset).useLines { it.forEach { line ->
             onLine(line)
         } }
     }
     private suspend fun stdErrRead(stream:InputStream) = read(stream) {
-        error("failed", it)
-        emit(ProcessingResults.Error(it))
+        onLineErr(it)
     }
     private suspend fun stdOutRead(stream:InputStream) = read(stream) {
-        debug("message", it)
-        emit(ProcessingResults.Message(it))
-    }
-    private suspend fun handlingProcessError(error: Throwable) = when {
-        error is IOException && error.message!=null -> {
-            println("catch IO exception \n $error")
-            val msg = error.message!!
-            when {
-                msg.matches(exceptionRegex) -> {
-                    //["114514","message"]
-                    exceptionRegex.find(msg)!!
-                        .groupValues
-                        .takeIf { it.size > 1 }
-                        ?.let { lastMsg(it[2], it[1].toInt()) }
-
-                }
-                "error=" in msg -> {
-                    //["cannot run xxxx","114514,message"]
-                    msg.split("error=")[1]
-                        .split(",")
-                        .takeIf { it.size > 1 }
-                        ?.let { lastMsg(it[2], it[1].toInt()) }
-                }
-                else -> {
-                    lastMsg(msg)
-                }
-            }
-            close()
-        }
-        else -> {
-            lastMsg(error.toString())
-        }
-    }
-    private val process by lazy {
-        runCatching {
-            create()
-        }.onFailure { runBlocking {
-            handlingProcessError(it)
-        } }
-            .getOrNull()
+        onLineOut(it)
     }
 
-
-
-    private val block:suspend CoroutineScope.()->CommandResult = {
+    override suspend fun running(): CommandResult {
         runJobInside()
         debug("block returning")
-        result!!
-    }
-    private val continuation = block.createCoroutineUnintercepted(this, this)
-    private val collectors = arrayListOf<FlowCollector<ProcessingResults>>()
-    private var result:CommandResult? = null
-
-    private val replayCache: ArrayList<ProcessingResults> = arrayListOf()
-
-    override fun onStart() {
-        try {
-            continuation.intercepted().resumeCancellableWith(Result.success(Unit))
-            debug("resumed")
-        }catch (e:Exception) {
-            runBlocking {
-                handlingProcessError(e)
-            }
-        }
-    }
-
-    init {
-        if (startWithCreate) start()
-    }
-
-    private suspend fun emit(processingResults: ProcessingResults) {
-        replayCache.add(processingResults)
-        for (collector in collectors) {
-            collector.emit(processingResults)
-        }
-        if (processingResults is ProcessingResults.Closed) {
-            result = replayCache.toResult(id)
-        }
-    }
-
-    private val newIOContext get() = coroutineContext.newCoroutineContext(IO)
-
-
-    override suspend fun collect(collector: FlowCollector<ProcessingResults>) {
-        debug("run: ${start()}")
-
-        replayCache.forEach {
-            collector.emit(it)
-        }
-        collectors.add(collector)
-        while (result==null) delay(10)
-    }
-
-    override suspend fun await(): CommandResult {
-        debug("waiting")
-        while (result==null) delay(10)
-        debug("awaited")
         return result!!
     }
-
-
-    @ExperimentalCoroutinesApi
-    override fun getCompleted(): CommandResult {
-        return result!!
-    }
-
-    /**
-     * FIXME:永远不可能修复了估计,来个大佬吧
-     */
-
-    @Deprecated("DONT USE IT", ReplaceWith("Nothings"))
-    override val onAwait: SelectClause1<CommandResult> get() = TODO("Not yet implemented")
-
 
     companion object {
 
-        /**
-         * 用于匹配错误的Regex
-         */
-        internal val exceptionRegex by lazy {
-            "Cannot run program \".+\": error=(\\d+), (.+)"
-                .toRegex()
-        }
 
         /**
          * 假构造器
@@ -277,8 +147,10 @@ class Shell(
             isKeepCLIAndWrite: Boolean = false,// keep cmd maybe (
             startWithCreate: Boolean = true,
             charset: Charset = defaultCharset,
+            workdir: File? = null,
             prefix: Array<String> = defaultPrefix
         ):Shell {
+
             val id = getNewId()
             fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
             require(commandLines.isNotEmpty()) {
@@ -293,7 +165,7 @@ class Shell(
             println("new command",
                 (if (isKeepCLIAndWrite) prefix.joinToString(" && ") else prefix.joinToString(" ")+" "+commandLines.joinToString(" && "))
             )
-            return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate, id = id, charset = charset) {
+            return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate, id = id, charset = charset, workdir = workdir) {
                 if (!isKeepCLIAndWrite) commandLines.forEach(this::run)
             }
         }

@@ -17,7 +17,6 @@ subprojects {
     apply( plugin = "maven-publish")
     apply( plugin =  "org.jetbrains.kotlin." +
             if (name!="khell-nu-process") "multiplatform" else  "jvm")
-
     val local = when {
         rootProject.file("local.properties").exists() -> rootProject.props["local"]["maven_repo_dir"] as String?
         System.getenv("LOCAL_MAVEN_REPO_DIR") != null -> System.getenv("LOCAL_MAVEN_REPO_DIR")
@@ -45,8 +44,5 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-    }
-    tasks.withType<KotlinCompile> {
-        kotlinOptions.jvmTarget = "11"
     }
 }

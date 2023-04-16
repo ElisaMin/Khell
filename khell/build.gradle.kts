@@ -14,7 +14,7 @@ kotlin {
     sourceSets {
         commonMain {
             kotlin {
-                jvmToolchain(Runtime.version().feature())
+                jvmToolchain(19)
                 targets.all {
                     compilations.all {
                         kotlinOptions {
