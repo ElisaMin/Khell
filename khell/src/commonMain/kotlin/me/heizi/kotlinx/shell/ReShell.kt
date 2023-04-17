@@ -14,6 +14,28 @@ import me.heizi.kotlinx.logger.debug as dddd
 import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
+
+@RequiresOptIn(
+    message = "This API is experimental and may be changed in the future.",
+    level = RequiresOptIn.Level.WARNING
+)
+annotation class ExperimentalApiReShell
+
+/**
+ * A shell that can be used to execute commands
+ *
+ * @param forest the prefix of command
+ * @param charset the charset of command
+ * @param coroutineContext the coroutine context of shell
+ * @param environment the environment of shell
+ * @param workdir the workdir of shell
+ * @param isRedirect whether redirect the output of shell
+ * @param signalBuffer the buffer size of signal
+ * @param flow signals, use by default please
+ * @param coroutineStart the coroutine start of shell
+ * @param stdin dsl the stdin of shell
+ */
+@ExperimentalApiReShell
 internal suspend fun buildReShellFlow(
     forest: CommandPrefix = defaultPrefix,
     charset: Charset = defaultCharset,
@@ -27,33 +49,26 @@ internal suspend fun buildReShellFlow(
     stdin:(suspend WriteScope.() -> Unit)? = null,
 )= coroutineScope {
     val job = launch(coroutineContext, coroutineStart) {
-        val shell = buildReShell(
-            flow = flow,
-            forest = forest,
-            charset = charset,
-            environment = environment,
-            workdir = workdir,
-            isRedirect = isRedirect,
-            stdin = stdin
-        )!!
+        val shell = buildReShell(flow = flow, forest = forest, charset = charset, environment = environment, workdir = workdir, isRedirect = isRedirect, stdin = stdin)!!
         shell.debug("shell","built")
     }
-    flow.closable().onStart {
-        job.invokeOnCompletion { cause ->
-            if (cause != null && cause!is CancellationException) launch {
-                handlingProcessError(cause,::lastMsg)
-            }
+    flow.closable().onStart { job.invokeOnCompletion { cause ->
+        if (cause != null && cause!is CancellationException) launch {
+            handlingProcessError(cause,::lastMsg)
         }
+    }
         job.start()
+    }.onCompletion {
+        job.cancel()
     }
 }
 
-
 @JvmInline
+@ExperimentalApiReShell
 value class ReShell internal constructor(
     internal val process: Process,
 ) { companion object {
-
+    @ExperimentalApiReShell
     operator fun invoke(
         forest: CommandPrefix = defaultPrefix,
         charset: Charset = defaultCharset,
@@ -77,7 +92,7 @@ value class ReShell internal constructor(
         flow = flow,
         stdin = stdin,
     )
-
+    @ExperimentalApiReShell
     suspend operator fun invoke(
         forest: CommandPrefix = defaultPrefix,
         charset: Charset = defaultCharset,
@@ -99,6 +114,26 @@ value class ReShell internal constructor(
         coroutineStart = coroutineStart,
         stdin = stdin,
     )
+    @ExperimentalApiReShell
+    suspend operator fun invoke(
+        vararg commands:String,
+        coroutineContext: CoroutineContext = IO,
+        coroutineStart: CoroutineStart = CoroutineStart.DEFAULT,
+        charset: Charset = defaultCharset,
+        environment: Map<String, String>? = null,
+        workdir: File? = null,
+        isRedirect: Boolean = false,
+        forest: CommandPrefix = defaultPrefix,
+    ) = invoke(
+        forest = forest+commands,
+        charset = charset,
+        coroutineContext = coroutineContext,
+        environment = environment,
+        workdir = workdir,
+        isRedirect = isRedirect,
+        coroutineStart = coroutineStart,
+        stdin = null,
+    )
 
 } }
 
@@ -106,6 +141,12 @@ value class ReShell internal constructor(
 suspend fun Flow<Signal>.await():CommandResult =
         toList().asSequence().toResult()
 
+/**
+ * package as KShell, [Deferred] async result type as [CommandResult], mixing [Flow] as [Signal] .
+ *
+ * preferred to use [Flow.await] instead
+ */
+@ExperimentalApiReShell
 internal inline fun ReKShell(
     forest: CommandPrefix = defaultPrefix,
     charset: Charset = defaultCharset,
@@ -120,18 +161,8 @@ internal inline fun ReKShell(
 ):KShell {
 
     val async = KShell.async(coroutineContext,coroutineStart) {
-        buildReShellFlow(
-            forest = forest,
-            charset = charset,
-            coroutineContext = coroutineContext,
-            environment = environment,
-            workdir = workdir,
-            isRedirect = isRedirect,
-            signalBuffer = signalBuffer,
-            coroutineStart = coroutineStart,
-            stdin = stdin,
-            flow = flow
-        ).await()
+        buildReShellFlow(forest = forest, charset = charset, coroutineContext = coroutineContext, environment = environment, workdir = workdir, isRedirect = isRedirect, signalBuffer = signalBuffer, coroutineStart = coroutineStart, stdin = stdin, flow = flow)
+            .await()
     }
     async.invokeOnCompletion { cause ->
         if (cause != null && cause !is CancellationException) KShell.launch {
@@ -145,7 +176,11 @@ internal inline fun ReKShell(
 }
 
 
-
+/**
+ * create and catching a jvm Process singleton
+ * and covert it just like flow return a cancelable flow
+ */
+@ExperimentalApiReShell
 internal suspend fun buildReShell(
     flow: MutableSharedFlow<Signal> = MutableSharedFlow(),
     forest: CommandPrefix = defaultPrefix,
@@ -180,32 +215,44 @@ internal suspend fun buildReShell(
     handlingProcessError(e,flow::lastMsg)
 }.getOrNull()?.running(flow,isRedirect, charset, stdin)
 
+/**
+ * std in and out 's all handling in here like the hub
+ * it contends the waiting job ether
+ */
+@ExperimentalApiReShell
 internal suspend inline fun ReShell.running(
-    flow: MutableSharedFlow<Signal> = MutableSharedFlow(),
+    signals: MutableSharedFlow<Signal> = MutableSharedFlow(),
     isRedirected: Boolean,
     charset: Charset = defaultCharset,
-    noinline block: (suspend WriteScope.() -> Unit)?
+    noinline stdin: (suspend WriteScope.() -> Unit)?
 ) = coroutineScope {
     debug("run", "ready")
     launch {
-        block?.let {
+        stdin?.let {
             input(charset, it)
         }
     }
     launch {
-        stdout(charset).collect { flow.emit(it) }
+        stdout(charset).collect { signals.emit(it) }
     }
     if (!isRedirected) launch {
-        stderr(charset).collect { flow.emit(it) }
+        stderr(charset).collect { signals.emit(it) }
     }
-    debug("run", "waiting")
-    waitFor().collect { flow.emit(it) }
+    debug("wait for", "ready")
+    waitFor().collect { signals.emit(it) }
     this@running
 }
-
+@ExperimentalApiReShell
 internal inline fun ReShell.close() = runCatching {
     process.destroy()
 }
+
+/**
+ * waiting for process death
+ *
+ * @return Flow<Signal>
+ */
+@ExperimentalApiReShell
 internal inline fun ReShell.waitFor() = flow {
     debug("waitFor", "ready")
     val r = process.waitFor()
@@ -216,6 +263,12 @@ internal inline fun ReShell.waitFor() = flow {
     debug("waitFor", "closed")
 }.flowOn(IO)
 
+/**
+ * DSL writing to process
+ *
+ * suspend function to write in to process
+ */
+@ExperimentalApiReShell
 internal suspend inline fun ReShell.input(
     charset: Charset = defaultCharset,
     crossinline block: suspend WriteScope.() -> Unit
@@ -231,12 +284,25 @@ internal suspend inline fun ReShell.input(
     debug("input","closing")
 }
 
+/**
+ * collecting stderr
+ *
+ * covert as flow
+ */
+@ExperimentalApiReShell
 fun ReShell.stderr(charset: Charset = defaultCharset) = flow {
     debug("stderr","ready")
     process.errorReader(charset).useLines {
         it.forEach { s -> emit(s) }
     }
 }.map(Signal::Error)
+
+/**
+ * collecting stdout
+ *
+ * covert as flow
+ */
+@ExperimentalApiReShell
 fun ReShell.stdout(charset: Charset = defaultCharset) = flow {
     debug("stdout","ready")
     process.inputReader(charset).useLines {
@@ -244,6 +310,12 @@ fun ReShell.stdout(charset: Charset = defaultCharset) = flow {
     }
 }.map(Signal::Output)
 
+/**
+ * last message
+ *
+ * on error close before
+ */
+@ExperimentalApiReShell
 suspend inline fun FlowCollector<Signal>.lastMsg (msg:String?,code:Int?){
     msg?.let { s ->
         emit(Signal.Error(s))
@@ -251,6 +323,12 @@ suspend inline fun FlowCollector<Signal>.lastMsg (msg:String?,code:Int?){
     emit(Signal.Code((code?:-1)))
     emit(Signal.Closed)
 }
+
+/**
+ * error handling
+ *
+ * catch Command Execute Error
+ */
 suspend fun handlingProcessError(
     error: Throwable,lastMsg:suspend (String?,Int?)->Unit,
 ) = when {
@@ -287,10 +365,14 @@ suspend fun handlingProcessError(
     }
 }
 
-
+// log
+@ExperimentalApiReShell
 internal inline fun ReShell.id() = process.pid()
+@ExperimentalApiReShell
 internal inline fun ReShell.debug(vararg any: Any?) = "KShell#${id()}".dddd(*any)
+@ExperimentalApiReShell
 internal inline fun ReShell.error(vararg any: Any?) = "KShell#${id()}".eeee(*any)
+@ExperimentalApiReShell
 internal inline fun ReShell.infos(vararg any: Any?) = "KShell#${id()}".pppp(*any)
 typealias CommandPrefix = Array<String>
 
