@@ -47,7 +47,7 @@ suspend fun main() = coroutineScope {
 //    !"nu shell"
     repeat(times,) {
         DebugProbes.dumpCoroutines()
-        NuShell(prefix = arrayOf("cmd","/c","echo heizi")) {
+        NuShell(forest =  arrayOf("cmd","/c","echo heizi")) {
         }.join()
     }
     !"shell"
@@ -69,10 +69,10 @@ class Branch {
     fun test() = runBlocking {
         println("haha")
         debug("haha")
-//        Shell( "echo heizi").collect {
-//            println(it)
-//        }
-        NuShell(prefix = arrayOf("cmd","/c","echo heizi"))
+        Shell( "echo heizi").collect {
+            println(it)
+        }
+        NuShell(forest = arrayOf("cmd","/c","echo heizi"))
             .apply { start() }
             .collect {
             println(it)

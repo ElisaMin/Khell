@@ -1,3 +1,4 @@
+@file:Suppress("NOTHING_TO_INLINE")
 package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
@@ -8,7 +9,6 @@ import java.io.InputStream
 import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
-import me.heizi.kotlinx.logger.println as pppp
 
 
 /**
@@ -20,42 +20,42 @@ import me.heizi.kotlinx.logger.println as pppp
  * I recommend the fake constructor if you just want to **run a simple command**
  * @see Shell.invoke
  *
- * @property prefix how to start a process.
- * @property env event args
- * @property isMixingMessage stderr redirect to stdout when true
- * @property isEcho echo command line before run the command line.
- * @property onRun you can delay or something to using [RunScope.run] run some fancy line.
+ * @property forest how to start a process.
+ * @property isRedirect stderr redirect to stdout when true
+ * @property commandWriter you can delay or something to using [RunScope.run] run some fancy line.
  * @param coroutineContext I don't know what's it So I'm just added it.
  * @param charset make sure you won't see some fancy line you have never seen before
- * @param startWithCreate don't you can read the name ? idiot
+ * @param active state of coroutine on start
  */
 @OptIn(InternalCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 class Shell(
     coroutineContext: CoroutineContext= EmptyCoroutineContext,
-    private val prefix: Array<String> = defaultPrefix,
-    private val env: Map<String, String>? = null,
-    private val isMixingMessage: Boolean = false,
-    private val isEcho: Boolean = false,
-    startWithCreate: Boolean = true,
-    id: Int = getNewId(),
-    private val charset: Charset = defaultCharset,
-    private val workdir: File? = null,
-    private val onRun: suspend RunScope.() -> Unit,
-): AbstractKShell(coroutineContext, prefix, env, isMixingMessage, isEcho, startWithCreate, id, charset,workdir, onRun) {
+    forest: Array<String> = defaultPrefix,
+    environment: Map<String, String>? = null,
+    workdir: File? = null,
+    active: Boolean = true,
+    charset: Charset = defaultCharset,
+    isRedirect: Boolean = false,
+    stdin:(suspend WriteScope.() -> Unit)? = null,
+): AbstractKShell(
+    coroutineContext, forest, environment, workdir,
+    active, charset , isRedirect, commandWriter =  stdin,
+) {
+
 
 
     private val process by lazy {
         runCatching {
-            create()
+            process()
         }.onFailure {
             handlingProcessError(it)
         }.getOrNull()
     }
 
-    private fun create() = ProcessBuilder(*prefix).apply {
-        if (isMixingMessage) this.redirectErrorStream(true)
+    private inline fun process() = ProcessBuilder(*forest).apply {
+        if (isRedirect) this.redirectErrorStream(true)
         workdir?.let(this::directory)
-        env?.takeIf { it.isNotEmpty() }?.let {
+        environment?.takeIf { it.isNotEmpty() }?.let {
             val e = environment()
             e.putAll(it)
         }
@@ -73,14 +73,15 @@ class Shell(
             stdOutRead(process!!.inputStream)
         }
     }
-    private suspend fun writeJob() = coroutineScope {
+    private suspend fun writeJob() = commandWriter?.let { run-> coroutineScope {
         launch(newIOContext) {
-            process!!.outputStream.writer(charset).getDefaultRunScope(isEcho, id).let {
-                debug("writing")
-                onRun(it)
+            process!!.outputStream.bufferedWriter(charset).use {
+                run(it.asCommandWriter())
             }
         }
-    }
+    } }
+
+
     private suspend inline fun runJobInside() = coroutineScope {
         debug("building runner")
         require(process!=null) {
@@ -89,11 +90,10 @@ class Shell(
         debug("runner bullied")
         collectOutJob()
         //如果混合消息则直接跳过这次的collect
-        if (!isMixingMessage) collectErrJob()
-        writeJob().invokeOnCompletion {error->
+        if (!isRedirect) collectErrJob()
+        writeJob()?.invokeOnCompletion {error->
             error?.let {
                 debug("write job failed",it)
-                process!!.outputStream.close()
             }
         }
         val code = withContext(IO) {
@@ -122,7 +122,11 @@ class Shell(
         onLineOut(it)
     }
 
-    override suspend fun running(): CommandResult {
+    override suspend fun create() {
+        process!!
+    }
+
+    override suspend fun CoroutineScope.running(): CommandResult {
         runJobInside()
         debug("block returning")
         return result!!
@@ -150,9 +154,6 @@ class Shell(
             workdir: File? = null,
             prefix: Array<String> = defaultPrefix
         ):Shell {
-
-            val id = getNewId()
-            fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
             require(commandLines.isNotEmpty()) {
                 "unless one command"
             }
@@ -162,12 +163,20 @@ class Shell(
                     else commandLines.joinToString(" && ")
                 }
             // Log
-            println("new command",
-                (if (isKeepCLIAndWrite) prefix.joinToString(" && ") else prefix.joinToString(" ")+" "+commandLines.joinToString(" && "))
-            )
-            return  Shell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate, id = id, charset = charset, workdir = workdir) {
+//            println("new command",
+//                (if (isKeepCLIAndWrite) prefix.joinToString(" && ") else prefix.joinToString(" ")+" "+commandLines.joinToString(" && "))
+//            )
+            return Shell(
+                forest = prefix,
+                environment = globalArg,
+                isRedirect = isMixingMessage,
+                active = startWithCreate,
+                charset = charset,
+                workdir = workdir
+            ) {
                 if (!isKeepCLIAndWrite) commandLines.forEach(this::run)
             }
         }
     }
 }
+

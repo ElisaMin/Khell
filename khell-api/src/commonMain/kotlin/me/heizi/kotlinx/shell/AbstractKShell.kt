@@ -2,7 +2,6 @@ package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.internal.resumeCancellableWith
 import kotlinx.coroutines.selects.SelectClause1
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
 import java.io.File
@@ -10,100 +9,72 @@ import java.io.IOException
 import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.intrinsics.createCoroutineUnintercepted
-import kotlin.coroutines.intrinsics.intercepted
 import me.heizi.kotlinx.logger.debug as dddd
 import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
-
-
-@Suppress("DELEGATED_MEMBER_HIDES_SUPERTYPE_OVERRIDE", "NOTHING_TO_INLINE")
+@Deprecated("This class is deprecated and will be removed in the future", ReplaceWith("ReShell"), DeprecationLevel.ERROR)
+@Suppress("NOTHING_TO_INLINE")
 @OptIn(InternalCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 abstract class AbstractKShell(
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
-    private val startCommand: Array<String>,
-    private val environment: Map<String, String>? = null,
-    private val isMixingMessage: Boolean = false,
-    private val isEcho: Boolean = false,
-    startWithCreate: Boolean = true,
+    protected val forest: Array<String> = emptyArray(),
+    protected val environment: Map<String, String>? = null,
+    protected val workdir: File? = null,
+    active: Boolean = true,
+    protected val charset: Charset,
+    protected val isRedirect: Boolean = false,
     protected val id: Int = getNewId(),
-    private val charset: Charset,
-    private val workdir: File? = null,
-    private val onRun: suspend RunScope.() -> Unit,
+    protected val commandWriter: (suspend WriteScope.() -> Unit)? = null,
 ): KShell,
-    CoroutineScope by CoroutineScope(coroutineContext+CoroutineName("shell-worker#$id")),
-    AbstractCoroutine<CommandResult>(coroutineContext+CoroutineName("shell-worker#$id"), false, false)
-{
+//    CoroutineScope by CoroutineScope(coroutineContext+CoroutineName("shell-worker#$id")),
+    AbstractCoroutine<CommandResult>(coroutineContext+CoroutineName("shell-worker#$id"), false, false) {
 
-    public constructor(
-        vararg commandLines:String,
-        environment: Map<String, String>?,
-        isMixingMessage: Boolean = false,
-        keepCLIPrefix: Array<String>? = arrayOf("cmd.exe", "/k","echo off"), // keep cmd maybe (
-        startWithCreate: Boolean = true,
-        charset: Charset = Charsets.UTF_8,
-        workdir: File? = null,
-        prefix: Array<String> = arrayOf("cmd.exe", "/c"),
-    ):this(
-        startCommand = kotlin.run {
-            require(commandLines.isNotEmpty()) {
-                "unless one command"
-            }
-            keepCLIPrefix ?: kotlin.run {
-                prefix + commandLines.run {
-                    if (size == 1) first()
-                    else commandLines.joinToString(" && ")
-                }
-            }
-        },onRun = {
-            if (keepCLIPrefix!=null) commandLines.forEach(this::run)
-        } , environment = environment,
-        isMixingMessage=isMixingMessage,
-        isEcho = false, startWithCreate = startWithCreate,
-        charset = charset, workdir = workdir
-    )
-
-    private val block:suspend CoroutineScope.()->CommandResult = {
-        running()
+    // deprecated
+    init {
+        throw NotImplementedError("This class is deprecated and will be removed in the future")
     }
-    protected abstract suspend fun running():CommandResult
 
-    private val continuation by lazy {
-        block.createCoroutineUnintercepted(this, this)
+    protected abstract suspend fun create()
+
+    protected open suspend fun CoroutineScope.running():CommandResult {
+        throw NotImplementedError("You should override this method")
     }
+    protected open suspend fun after() {}
+
+//    private val block:suspend CoroutineScope.()->CommandResult by lazy { {
+//        debug("lesumdo")
+//        create()
+//
+//        running().also { result = it }
+//    } }
+
+
+
     override fun onStart() {
-        try {
-            continuation.intercepted().resumeCancellableWith(Result.success(Unit))
-            debug("resumed")
-        }catch (e:Exception) {
-            handlingProcessError(e)
-        }
+
     }
     protected var result:CommandResult? = null
+
+
+    //log helper
     protected val idS = "shell#${id}"
     protected fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
     protected fun debug(vararg any: Any?) = idS.dddd("running", *any)
     protected fun error(vararg any: Any?) = idS.eeee("running", *any)
 
+    //flow helper
+    protected fun close() { emit(ProcessingResults.Closed)}
     protected fun lastMsg(msg:String?, code:Int = -1) {
-        msg?.let {
-            emit(ProcessingResults.Error(it))
-        }
+        msg?.let { emit(ProcessingResults.Error(it)) }
         emit(ProcessingResults.CODE(code))
         close()
     }
-    protected fun close()  {
-        emit(ProcessingResults.Closed)
-    }
-    protected inline fun <T:Any?> handled(crossinline block: () -> T?): T? = try {
-        block()
-    } catch (e: Throwable) {
-        runBlocking {
-            handlingProcessError(e)
-        }
-        null
-    }
+    //error helper
+    protected inline fun <T:Any?> handled(crossinline block: () -> T?): T?
+        = runCatching(block)
+            .onFailure(::handlingProcessError)
+            .getOrNull()
     protected fun handlingProcessError(error: Throwable) = when {
         error is IOException && error.message!=null -> {
             println("catch IO exception \n $error")
@@ -138,6 +109,7 @@ abstract class AbstractKShell(
         }
     }
 
+    //output helper
     protected inline fun onLineOut(line:String) {
         debug("out", line)
         emit(ProcessingResults.Message(line))
@@ -146,14 +118,12 @@ abstract class AbstractKShell(
         error("err", line)
         emit(ProcessingResults.Error(line))
     }
-
     protected val newIOContext get() = coroutineContext.newCoroutineContext(Dispatchers.IO)
-
+    //flows
     protected val collectors = arrayListOf<FlowCollector<ProcessingResults>>()
-
     protected val replayCache: ArrayList<ProcessingResults> = arrayListOf()
-
     fun emit(processingResults: ProcessingResults) {
+        debug("sending")
         replayCache.add(processingResults)
         for (collector in collectors) {
             launch {
@@ -161,20 +131,22 @@ abstract class AbstractKShell(
             }
         }
         if (processingResults is ProcessingResults.Closed) {
+            debug("send done")
             result = replayCache.toResult(id)
+            this.cancel()
         }
     }
-    override suspend fun collect(collector: FlowCollector<ProcessingResults>) {
-        debug("run: ${start()}")
-
-        replayCache.forEach {
-            collector.emit(it)
-        }
+    override suspend fun collect(collector: FlowCollector<Signal>) {
+        debug("calling collecting")
+        replayCache.forEach { collector.emit(it) }
         collectors.add(collector)
         while (result==null) delay(10)
     }
     init {
-        if (startWithCreate) start()
+        if (active) {
+            debug("calling start",start())
+        }
+        println("new command", *forest,)
     }
 
     companion object {

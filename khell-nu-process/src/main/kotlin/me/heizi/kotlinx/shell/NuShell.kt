@@ -1,11 +1,11 @@
+
 package me.heizi.kotlinx.shell
 
 import com.zaxxer.nuprocess.NuProcess
 import com.zaxxer.nuprocess.NuProcessBuilder
 import com.zaxxer.nuprocess.codec.NuAbstractCharsetHandler
 import kotlinx.coroutines.*
-import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.*
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.Charset
@@ -13,6 +13,8 @@ import java.nio.charset.CoderResult
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+
 
 /**
  * ## NuShell - NuProcess的封装类
@@ -21,7 +23,7 @@ import kotlin.coroutines.CoroutineContext
  * That means you can use await to wait for [CommandResult]  or collect [ProcessingResults].
  *
  * I recommend the fake constructor if you just want to **run a simple command**
- * @see Shell.invoke
+ * @see KuShell.invoke
  *
  * @property prefix how to start a process.
  * @property env event args
@@ -34,23 +36,23 @@ import kotlin.coroutines.CoroutineContext
  */
 @OptIn(InternalCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 
-class NuShell constructor(
-    coroutineContext: CoroutineContext= IO,
-    private val prefix: Array<String> = defaultPrefix,
-    private val env: Map<String, String>? = null,
-    private val isMixingMessage: Boolean = false,
-    private val isEcho: Boolean = false,
-    startWithCreate: Boolean = true,
-    id: Int = getNewId(),
+class NuShell(
+    coroutineContext: CoroutineContext = EmptyCoroutineContext,
+    forest: Array<String> = emptyArray(),
+    environment: Map<String, String>? = null,
     workdir: Path? = null,
-    private val charset: Charset = defaultCharset,
-    private val onRun: suspend RunScope.() -> Unit,
-): AbstractKShell(coroutineContext, prefix, env, isMixingMessage, isEcho, startWithCreate, id, charset,workdir?.toFile(), onRun)
+    active: Boolean = true,
+    charset: Charset = defaultCharset,
+    isRedirect: Boolean = false,
+    stdIn: (suspend WriteScope.() -> Unit)?=null
+): AbstractKShell(coroutineContext, forest, environment, workdir?.toFile(), active, charset, isRedirect, commandWriter = stdIn)
 {
     private val process by lazy {
         debug("runner","building")
-        handled { NuProcessBuilder(nuHandler,*prefix).run {
-            env?.let { environment().putAll(it) }
+        handled { NuProcessBuilder().run {
+            setProcessListener(nuHandler)
+            command().addAll(forest)
+            environment?.let { environment().putAll(it) }
             workdir?.let { setCwd(it) }
             start().also { println("runner","built") }
         } }
@@ -72,17 +74,14 @@ class NuShell constructor(
 
         }
     }
-    private fun stdin(nuProcess: NuProcess)  {
-        object : RunScope {
-            override fun run(command: String) {
-                val invokingCommand = command.takeIf { it.last() == '\n' } ?: "$command\n"
-                debug("writing",invokingCommand)
-                nuProcess.writeStdin(ByteBuffer.wrap(
-                    invokingCommand.toByteArray(charset)
-                    )
-                )
-            }
-        }
+    private fun stdin(nuProcess: NuProcess) = launch {
+        debug("stdin","building")
+        commandWriter?.invoke(object : WriteScope { override fun write(string: String) {
+            debug("writing",string)
+            nuProcess.writeStdin(ByteBuffer.wrap(
+                string.toByteArray(charset)
+            ))
+        } })
     }
     private fun stdout(chars: CharBuffer) {
         chars.lineSequence().forEach {
@@ -95,7 +94,11 @@ class NuShell constructor(
         }
     }
 
-    override suspend fun running(): CommandResult {
+    override suspend fun create() {
+
+    }
+
+    override suspend fun CoroutineScope.running(): CommandResult {
         debug("building runner")
         require(process!=null) {
             "process is not even running"
@@ -114,6 +117,14 @@ class NuShell constructor(
         this@NuShell.debug("block returning")
         return result!!
     }
+
+    init {
+        if (active) {
+            start()
+
+        }
+    }
+
     companion object {
 
         private val defaultPrefix:Array<String>
@@ -134,22 +145,20 @@ class NuShell constructor(
             prefix: Array<String> = defaultPrefix
         ):NuShell {
 
-//            val id = getNewId()
-//            fun println(vararg any: Any?) = "shell#${id}".pppp("running",*any)
-//            require(commandLines.isNotEmpty()) {
-//                "unless one command"
-//            }
             val prefix = if (isKeepCLIAndWrite) keepCLIPrefix else
                 prefix + commandLines.run {
                     if (size == 1) first()
                     else commandLines.joinToString(" && ")
                 }
-            // Log
-//            println("new command",
-//                (if (isKeepCLIAndWrite) prefix.joinToString(" && ") else prefix.joinToString(" ")+" "+commandLines.joinToString(" && "))
-//            )
-            return  NuShell(prefix=prefix, env = globalArg, isMixingMessage=isMixingMessage, isEcho = false, startWithCreate = startWithCreate, charset = charset, workdir = workdir) {
-                if (!isKeepCLIAndWrite) commandLines.forEach(this::run)
+            return NuShell(
+                forest = prefix,
+                environment = globalArg,
+                isRedirect = isMixingMessage,
+                charset = charset,
+                workdir = workdir,
+                active = startWithCreate,
+            ) {
+                if (!isKeepCLIAndWrite) commandLines.forEach(this::echoRun)
             }
         }
     }
