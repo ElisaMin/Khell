@@ -2,6 +2,7 @@
 package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.*
 import me.heizi.kotlinx.logger.error
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
@@ -9,11 +10,43 @@ import java.io.File
 import java.io.IOException
 import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 import me.heizi.kotlinx.logger.debug as dddd
 import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
+internal suspend fun buildReShellFlow(
+    forest: CommandPrefix = defaultPrefix,
+    charset: Charset = defaultCharset,
+    coroutineContext: CoroutineContext = IO,
+    environment: Map<String, String>? = null,
+    workdir: File? = null,
+    isRedirect: Boolean = false,
+    signalBuffer:Int = 1024,
+    flow: MutableSharedFlow<Signal> = MutableSharedFlow(replay = signalBuffer, extraBufferCapacity = 1024),
+    coroutineStart: CoroutineStart = CoroutineStart.LAZY,
+    stdin:(suspend WriteScope.() -> Unit)? = null,
+)= coroutineScope {
+    val job = launch(coroutineContext, coroutineStart) {
+        val shell = buildReShell(
+            flow = flow,
+            forest = forest,
+            charset = charset,
+            environment = environment,
+            workdir = workdir,
+            isRedirect = isRedirect,
+            stdin = stdin
+        )!!
+        shell.debug("shell","built")
+    }
+    flow.closable().onStart {
+        job.invokeOnCompletion { cause ->
+            if (cause != null && cause!is CancellationException) launch {
+                handlingProcessError(cause,::lastMsg)
+            }
+        }
+        job.start()
+    }
+}
 
 
 @JvmInline
@@ -24,14 +57,38 @@ value class ReShell internal constructor(
     operator fun invoke(
         forest: CommandPrefix = defaultPrefix,
         charset: Charset = defaultCharset,
-        coroutineContext: CoroutineContext = EmptyCoroutineContext,
+        coroutineContext: CoroutineContext = IO,
+        environment: Map<String, String>? = null,
+        workdir: File? = null,
+        isRedirect: Boolean = false,
+        signalBuffer: Int = 1024,
+        flow: MutableSharedFlow<Signal> = MutableSharedFlow(replay = signalBuffer, extraBufferCapacity = 1024),
+        coroutineStart: CoroutineStart = CoroutineStart.DEFAULT,
+        stdin:(suspend WriteScope.() -> Unit)? = null,
+    ):KShell = ReKShell(
+        forest = forest,
+        charset = charset,
+        coroutineContext = coroutineContext,
+        environment = environment,
+        workdir = workdir,
+        isRedirect = isRedirect,
+        signalBuffer = signalBuffer,
+        coroutineStart = coroutineStart,
+        flow = flow,
+        stdin = stdin,
+    )
+
+    suspend operator fun invoke(
+        forest: CommandPrefix = defaultPrefix,
+        charset: Charset = defaultCharset,
+        coroutineContext: CoroutineContext = IO,
         environment: Map<String, String>? = null,
         workdir: File? = null,
         isRedirect: Boolean = false,
         signalBuffer: Int = 1024,
         coroutineStart: CoroutineStart = CoroutineStart.DEFAULT,
         stdin:(suspend WriteScope.() -> Unit)? = null,
-    ):KShell = ReKShell(
+    ) = buildReShellFlow(
         forest = forest,
         charset = charset,
         coroutineContext = coroutineContext,
@@ -45,43 +102,49 @@ value class ReShell internal constructor(
 
 } }
 
+
+suspend fun Flow<Signal>.await():CommandResult =
+        toList().asSequence().toResult()
+
 internal inline fun ReKShell(
     forest: CommandPrefix = defaultPrefix,
     charset: Charset = defaultCharset,
-    coroutineContext: CoroutineContext = EmptyCoroutineContext,
+    coroutineContext: CoroutineContext = IO,
     environment: Map<String, String>? = null,
     workdir: File? = null,
     isRedirect: Boolean = false,
     signalBuffer:Int = 1024,
+    flow: MutableSharedFlow<Signal> = MutableSharedFlow(replay = signalBuffer, extraBufferCapacity = 1024),
     coroutineStart: CoroutineStart = CoroutineStart.LAZY,
     noinline stdin:(suspend WriteScope.() -> Unit)? = null,
 ):KShell {
-    val flow = MutableSharedFlow<Signal>(replay = signalBuffer, extraBufferCapacity = 1024)
-    val closeable = flow.closable()
-    val async = KShell.async(coroutineContext, coroutineStart) {
-        val shell = buildReShell(
-            flow = flow,
+
+    val async = KShell.async(coroutineContext,coroutineStart) {
+        buildReShellFlow(
             forest = forest,
             charset = charset,
+            coroutineContext = coroutineContext,
             environment = environment,
             workdir = workdir,
             isRedirect = isRedirect,
-            stdin = stdin
-        )!!
-        shell.debug("await","built")
-
-        closeable
-//        map { shell.debug("await","flow",it);it }.
-            .toList()
-            .also { shell.debug("await","flow closed") }
-            .asSequence().toResult()
+            signalBuffer = signalBuffer,
+            coroutineStart = coroutineStart,
+            stdin = stdin,
+            flow = flow
+        ).await()
     }
-    async.start()
+    async.invokeOnCompletion { cause ->
+        if (cause != null && cause !is CancellationException) KShell.launch {
+            handlingProcessError(cause,flow::lastMsg)
+        }
+    }
     return object :
         Deferred<CommandResult> by async,
-        Flow<Signal> by closeable,
+        Flow<Signal> by flow.closable(),
         KShell {}
 }
+
+
 
 internal suspend fun buildReShell(
     flow: MutableSharedFlow<Signal> = MutableSharedFlow(),
@@ -114,14 +177,8 @@ internal suspend fun buildReShell(
     it.debug("start"," well")
 }.onFailure { e ->
     e.error("start","error",e)
-    handlingProcessError(e) {m,c-> with(flow) {
-        m?.let { s ->
-            emit(Signal.Error(s))
-        }
-        emit(Signal.Code((c?:-1)))
-        emit(Signal.Closed)
-    }
-} }.getOrNull()?.running(flow,isRedirect, charset, stdin)
+    handlingProcessError(e,flow::lastMsg)
+}.getOrNull()?.running(flow,isRedirect, charset, stdin)
 
 internal suspend inline fun ReShell.running(
     flow: MutableSharedFlow<Signal> = MutableSharedFlow(),
@@ -157,7 +214,7 @@ internal inline fun ReShell.waitFor() = flow {
     close()
     emit(Signal.Closed)
     debug("waitFor", "closed")
-}.flowOn(Dispatchers.IO)
+}.flowOn(IO)
 
 internal suspend inline fun ReShell.input(
     charset: Charset = defaultCharset,
@@ -187,6 +244,13 @@ fun ReShell.stdout(charset: Charset = defaultCharset) = flow {
     }
 }.map(Signal::Output)
 
+suspend inline fun FlowCollector<Signal>.lastMsg (msg:String?,code:Int?){
+    msg?.let { s ->
+        emit(Signal.Error(s))
+    }
+    emit(Signal.Code((code?:-1)))
+    emit(Signal.Closed)
+}
 suspend fun handlingProcessError(
     error: Throwable,lastMsg:suspend (String?,Int?)->Unit,
 ) = when {
