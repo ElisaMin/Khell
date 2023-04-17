@@ -13,6 +13,22 @@ sealed class CommandResult {
     companion object {
         private var idMaker = 0
 
+        fun Sequence<Signal>.toResult(): CommandResult {
+            val code = filterIsInstance<Signal.Code>().firstOrNull()?.code ?: Int.MIN_VALUE
+            return if (code == 0) Success (
+                mapNotNull {
+                    when(it) {
+                        is Signal.Output -> it.message
+                        is Signal.Error -> it.message
+                        else -> null
+                    }
+                }.joinToString("\n")
+            ) else {
+                val msg = filterIsInstance<Signal.Output>().joinToString("\n") { it.message }
+                val err = filterIsInstance<Signal.Error>().joinToString("\n") { it.message }
+                Failed(msg,err,code)
+            }
+        }
         /**
          * 对完整的ResultList进行整合
          * @return 另外一种形式的ResultList(

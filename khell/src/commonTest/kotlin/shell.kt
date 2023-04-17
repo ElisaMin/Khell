@@ -1,7 +1,9 @@
 import kotlinx.coroutines.runBlocking
-import me.heizi.kotlinx.shell.CommandResult
-import me.heizi.kotlinx.shell.Shell
+import me.heizi.kotlinx.logger.debug
+import me.heizi.kotlinx.shell.*
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertSame
 
 class CommonTest {
     @Test
@@ -23,5 +25,28 @@ class CommonTest {
     }
     @Test fun `ping baidu` (): Unit = runBlocking {
         Shell("ping baidu.com").await()
+    }
+}
+class ReTest {
+    @Test fun `ping baidu by -k(eep)`() = runBlocking {
+        ReShell(keepCLIPrefix) {
+            this printlnRun  "ping baidu.com"
+            debug("exiting")
+            exit()
+        }.collect(::println)
+    }
+    @Test fun `ping baidu by -c`() = runBlocking {
+        ReShell(defaultPrefix+"ping baidu.com")
+            .collect(::println)
+    }
+    @Test fun `echo hello world result`() = runBlocking {
+        ReShell(defaultPrefix+"echo hello world")
+            .await().let { it as? CommandResult.Success }!!.message.let {
+                repeat(it.length) {i->
+                    assertEquals(it[i].code,"hello world"[i].code)
+                }
+//                println(it.lines().joinToString(prefix = "|", postfix = "|"))
+                assertEquals("hello world",it)
+            }
     }
 }
