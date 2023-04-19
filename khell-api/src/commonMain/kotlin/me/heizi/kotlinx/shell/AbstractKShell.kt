@@ -1,3 +1,4 @@
+@file:Suppress("unused","NOTHING_TO_INLINE")
 package me.heizi.kotlinx.shell
 
 import kotlinx.coroutines.*
@@ -13,8 +14,7 @@ import me.heizi.kotlinx.logger.debug as dddd
 import me.heizi.kotlinx.logger.error as eeee
 import me.heizi.kotlinx.logger.println as pppp
 
-@Deprecated("This class is deprecated and will be removed in the future", ReplaceWith("ReShell"), DeprecationLevel.ERROR)
-@Suppress("NOTHING_TO_INLINE")
+@Deprecated("This class is deprecated and will be removed in the future", ReplaceWith("ReShell"), DeprecationLevel.WARNING)
 @OptIn(InternalCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 abstract class AbstractKShell(
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
@@ -105,7 +105,7 @@ abstract class AbstractKShell(
         }
         else -> {
             throw error
-            lastMsg(error.toString())
+//            lastMsg(error.toString())
         }
     }
 
