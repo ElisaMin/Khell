@@ -1,9 +1,9 @@
 import com.android.build.gradle.LibraryExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinAndroidTarget
+import java.util.Properties
 
-apply("gradle/genLocal.gradle.kts")
-
+@Suppress("DSL_SCOPE_VIOLATION")
 plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.kotlin.jvm) apply false
@@ -18,11 +18,13 @@ allprojects {
         mavenCentral()
     }
 }
+
 subprojects { afterEvaluate {
     if (isMultiplatform)
         if(configKotlinMultiplatform())
             androidDefaultConfig()
 } }
+
 fun Project.configKotlinMultiplatform():Boolean {
     apply(plugin = "org.jetbrains.kotlin.multiplatform")
     var isAndroid = false
@@ -75,36 +77,58 @@ fun Project.androidDefaultConfig() {
             namespace = "me.heizi.kotlinx.${name.replace("-",".")}"
     }
 }
-interface Getter<T> {
-    operator fun get(key:String):T
-}
-val Project.props get() = object : Getter<java.util.Properties> {
-    override fun get(key: String): java.util.Properties = java.util.Properties().apply {
-        file("$key.properties").inputStream().use(::load)
-    }
-}
-
-operator fun <T> Property<T>.setValue (thisRef:Any?, prop: kotlin.reflect.KProperty<*>, value :T) {
-    set(value)
-}
-subprojects { when {
-    rootProject.file("local.properties").exists() -> rootProject.props["local"]["maven_repo_dir"] as String?
-    System.getenv("LOCAL_MAVEN_REPO_DIR") != null -> System.getenv("LOCAL_MAVEN_REPO_DIR")
-    else -> null
-}?.let {afterEvaluate {
-    apply(plugin = "org.jetbrains.kotlin.${ "multiplatform".takeIf { isMultiplatform } ?: "jvm" }")
+subprojects {
     apply(plugin = "maven-publish")
     configure<PublishingExtension> {
-        repositories {
-            maven {
-                url = uri(it)
-            }
-        }
         publications {
-            create<MavenPublication>("toLocal") {
-                from(components["kotlin"])
+            repositories {
+                maven {
+                    name = "test"
+                    url = uri("file://${rootProject.projectDir}/build/maven-repo/")
+                }
+                localRepo?.let {
+                    maven {
+                        url = uri(it)
+                    }
+                }
+                maven {
+                    name = "github"
+                    url = uri("https://maven.pkg.github.com/ElisaMin/Khell")
+                    credentials {
+                        username = System.getenv("GITHUB_ACTOR")
+                        password = System.getenv("GITHUB_TOKEN")
+                    }
+                }
             }
+            val pom = { it: MavenPublication ->
+                with(it) {
+                    pom {
+                        name.set("Khell")
+                        description.set("packaging the JVM 's Process class to Kotlin Style to supports coroutines")
+                        url.set("https://github.com/ElisaMin/Khell")
+                        developers {
+                            developer {
+                                id.set("ElisaMin")
+                                name.set("ElisaMin")
+                                email.set("Heizi@lge.fun")
+                            }
+                        }
+                        scm {
+                            connection.set("scm:git:git://github.com/ElisaMin/Khell.git")
+                            developerConnection.set("scm:git:ssh://github.com/ElisaMin/Khell.git")
+                            url.set("https://github.com/ElisaMin/Khell")
+                        }
+                    }
+                }
+            }
+            filterIsInstance<MavenPublication>().forEach(pom)
         }
-    } } }
+    }
 }
 val Project.isMultiplatform get() = pluginManager.hasPlugin("org.jetbrains.kotlin.multiplatform")
+
+val Project.localRepo get() = file("local.properties").takeIf { it.exists() }?.inputStream()?.use {
+    Properties().apply {
+        load(it)
+    }["local"] as String?
+}
