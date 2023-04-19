@@ -7,9 +7,7 @@ plugins {
 
 kotlin {
     jvm()
-    android {
-        publishLibraryVariants("release", "debug")
-    }
+    android()
     sourceSets {
         val libs = rootProject.libs
         commonMain {
@@ -51,41 +49,3 @@ kotlin {
         }
     }
 }
-
-android {
-    namespace = "me.heizi.kotlinx.khell"
-    compileSdk = 33
-    defaultConfig {
-        minSdk = 21
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-    testOptions {
-        unitTests.isReturnDefaultValues = true
-    }
-    lint {
-        abortOnError = false
-        baseline = file("build/lint-baseline.xml")
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    buildToolsVersion = "33.0.2"
-}
-
-
-
-group = "me.heizi.kotlinx"
-version = versions["khell"]
-dependencies {
-    api(project(":khell-log"))
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-}
-repositories {
-    mavenCentral()
-}
-
-
-//tasks.withType<Test> {
-//    useJUnitPlatform()
-//}

@@ -5,15 +5,9 @@ plugins {
 }
 kotlin {
     jvm()
-    android {with(project.android) {
-        namespace = "me.heizi.kotlinx.logger"
-        compileSdk = 33
-        @Suppress("DEPRECATION")
-        defaultConfig {
-            targetSdk = 33
-            minSdk = 21
-        }
-    }}
+    android {
+        android.namespace = "me.heizi.kotlinx.logger"
+    }
     sourceSets {
         commonTest {
             dependencies {
