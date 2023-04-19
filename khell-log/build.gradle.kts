@@ -27,7 +27,7 @@ kotlin {
                 implementation(libs.slf4j.log4j12)
             }
         }
-        
+
         getByName("jvmMain").dependencies {
             implementation(libs.slf4j.api)
         }
