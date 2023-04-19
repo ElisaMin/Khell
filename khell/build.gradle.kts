@@ -26,9 +26,5 @@ kotlin {
         getByName("androidMain").dependencies {
             implementation(libs.kotlinx.coroutines.core.android)
         }
-        getByName("androidInstrumentedTest").dependencies {
-//            implementation(project(mapOf("path" to ":khell")))
-            implementation(libs.androidx.test.junit)
-        }
     }
 }

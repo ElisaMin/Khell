@@ -35,10 +35,15 @@ fun Project.configKotlinMultiplatform():Boolean {
                 }
             }
             if (this is KotlinAndroidTarget) {
-                println("INFO: Android Project: ${project.name}")
+                println("is Android project!")
                 isAndroid = true
                 compilations.all {
                     kotlinOptions.jvmTarget = "11"
+                }
+                sourceSets.findByName("androidInstrumentedTest")?.dependencies {
+                    implementation(libs.androidx.runner)
+                    implementation(libs.androidx.test.junit)
+                    implementation(kotlin("test"))
                 }
             }
         }
@@ -53,8 +58,8 @@ fun Project.androidDefaultConfig() {
         @Suppress("DEPRECATION")
         defaultConfig {
             targetSdk = 33
+            minSdk = 21
             testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
         }
         compileOptions {
             sourceCompatibility = JavaVersion.VERSION_11
@@ -63,12 +68,11 @@ fun Project.androidDefaultConfig() {
         buildToolsVersion = "33.0.2"
         // disable lint class version check
         lint {
-            checkReleaseBuilds = false
             abortOnError = false
             baseline = file("lint-baseline.xml")
         }
         if (!name.endsWith("-log"))
-            namespace = "me.heizi.kotlinx.khell"
+            namespace = "me.heizi.kotlinx.${name.replace("-",".")}"
     }
 }
 interface Getter<T> {
