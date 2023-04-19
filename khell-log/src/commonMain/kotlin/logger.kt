@@ -11,7 +11,6 @@ import me.heizi.kotlinx.logger.error as Error
  *
  * check if its string plz
  * */
-
 expect fun Any?.println(any: Any?)
 expect fun Any?.error(any: Any?)
 expect fun Any?.debug(any: Any?)
@@ -21,6 +20,7 @@ expect fun Any?.debug(any: Any?)
  *
  * just to string
  */
+@JvmName("AnyToStringNamed")
 fun Any?.toStringNamed(separator:String = ", ", prefix: String ="[", suffix: String = "]"):String = when(this) {
     is String -> this
     null -> "Nothings"
@@ -36,9 +36,11 @@ fun Any?.toStringNamed(separator:String = ", ", prefix: String ="[", suffix: Str
     is Array<*> -> toList().toStringNamed(separator,prefix,suffix)
     else -> toString()
 }
-
+@JvmName("anythingsPrintlnAfterParsed")
 fun Any?.println(vararg any: Any?):Unit = this.Println(any.toStringNamed(": ","",""))
+@JvmName("anythingsErrorAfterParsed")
 fun Any?.error(vararg any: Any?):Unit = this.Error(any.toStringNamed(": ","",""))
+@JvmName("anythingsDebugAfterParsed")
 fun Any?.debug(vararg any: Any?):Unit = this.Debug(any.toStringNamed(": ","",""))
 
 

@@ -1,3 +1,4 @@
+@file:Suppress("unused")
 package me.heizi.kotlinx.logger
 
 import android.util.Log
@@ -19,5 +20,11 @@ fun String.error(msg:String) { Log.e(this,msg) }
 fun String.debug(msg:String) { Log.d(this,msg) }
 
 
-val Any?.TAG:String get() =
-    toStringNamed()
+val Any?.TAG:String get() {
+    this?.run {
+        this::class.simpleName?.let {
+            return it
+        }
+    }
+    return "NoTag"
+}
