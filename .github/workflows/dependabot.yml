@@ -1,0 +1,24 @@
+name: dependabot_auto_merge
+on: pull_request
+
+env:
+  TOKEN_DPB: ${{ secrets.TOKEN }}
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    environment: Dependabot
+    steps:
+      - name: $TOKEN_DPB
+        run: |
+          echo $TOKEN_DPB
+          echo ${{ secrets.GITHUB_TOKEN }}  
+          if [ -z "$TOKEN_DPB" ]; then
+            echo "TEST secret is not defined"
+            exit 1
+          fi
+
+      - run: echo token is $TOKEN_DPB == ${{ secrets.GITHUB_TOKEN }}
+      - uses: ahmadnassri/action-dependabot-auto-merge@v2
+        with:
+          github-token: $TOKEN_DPB
