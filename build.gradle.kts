@@ -1,6 +1,7 @@
 import com.android.build.gradle.LibraryExtension
 import me.heizi.koltinx.version.props
 import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
+import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.targets
 
 apply("gradle/genLocal.gradle.kts")
 
@@ -57,6 +58,11 @@ subprojects {
     }
     kotlinExtension.apply {
         jvmToolchain(19)
+        targets.forEach {
+            it.compilations.forEach {
+                it.kotlinOptions.freeCompilerArgs += "-Xcontext-receivers"
+            }
+        }
     }
     local?.let { configure<PublishingExtension> {
         repositories {

@@ -34,11 +34,4 @@ kotlin {
             }
         }
     }
-    targets.all {
-        compilations.all {
-            kotlinOptions {
-                freeCompilerArgs += "-Xcontext-receivers"
-            }
-        }
-    }
 }
