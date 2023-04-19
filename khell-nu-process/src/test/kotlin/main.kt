@@ -3,14 +3,13 @@ import kotlinx.coroutines.debug.DebugProbes
 import me.heizi.kotlinx.logger.debug
 import me.heizi.kotlinx.logger.println
 import me.heizi.kotlinx.shell.*
-import java.lang.StringBuilder
 import java.util.LinkedList
 import kotlin.test.Test
 
 
 val timess = LinkedList<String>()
 var currentTime = System.currentTimeMillis()
-inline operator fun String.not() {
+operator fun String.not() {
     val oldTime = currentTime
     currentTime = System.currentTimeMillis()
     (this + " -> "+(currentTime - oldTime)).let {
@@ -21,7 +20,7 @@ inline operator fun String.not() {
 
 
 @OptIn(ExperimentalCoroutinesApi::class)
-suspend fun main() = coroutineScope {
+suspend fun mains() = coroutineScope {
     DebugProbes.install()
     println(System.getProperty("com.zaxxer.nuprocess.threads", "auto"))
     !"start"
@@ -63,19 +62,29 @@ suspend fun main() = coroutineScope {
 class Branch {
     @Test
     fun loop3() = runBlocking {
-        main()
+//        main()
     }
     @Test
     fun test() = runBlocking {
         println("haha")
         debug("haha")
-        Shell( "echo heizi").collect {
-            println(it)
-        }
-        NuShell(forest = arrayOf("cmd","/c","echo heizi"))
-            .apply { start() }
-            .collect {
-            println(it)
-        }
+//        NuReShellBase(forest = arrayOf("cmd","/c","echo heizi")).onSuccess {
+//            it.collect {
+//                debug("result",it)
+//            }
+//        }
     }
 }
+
+suspend fun main() = coroutineScope {
+
+    "".println("haha")
+    "".debug("haha")
+//    NuReShellBase(forest = arrayOf("cmd","/c","echo heizi")).onSuccess {
+//        it.collect {
+//            "".debug("result",it)
+//        }
+//    }
+    Unit
+}
+
