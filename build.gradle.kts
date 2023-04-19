@@ -9,13 +9,12 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.libAndroid) apply false
 }
-
 allprojects {
     group = "me.heizi.kotlinx"
     version = rootProject.libs.versions.khell.get()
     repositories {
-        google()
         mavenCentral()
+        google()
     }
 }
 
@@ -103,20 +102,20 @@ subprojects {
             val pom = { it: MavenPublication ->
                 with(it) {
                     pom {
-                        name.set("Khell")
-                        description.set("packaging the JVM 's Process class to Kotlin Style to supports coroutines")
-                        url.set("https://github.com/ElisaMin/Khell")
+                        name = "Khell"
+                        description = "packaging the JVM 's Process class to Kotlin Style to supports coroutines"
+                        url = "https://github.com/ElisaMin/Khell"
                         developers {
                             developer {
-                                id.set("ElisaMin")
-                                name.set("ElisaMin")
-                                email.set("Heizi@lge.fun")
+                                id = "ElisaMin"
+                                name = "ElisaMin"
+                                email = "Heizi@lge.fun"
                             }
                         }
                         scm {
-                            connection.set("scm:git:git://github.com/ElisaMin/Khell.git")
-                            developerConnection.set("scm:git:ssh://github.com/ElisaMin/Khell.git")
-                            url.set("https://github.com/ElisaMin/Khell")
+                            connection = "scm:git:git://github.com/ElisaMin/Khell.git"
+                            developerConnection = "scm:git:ssh://github.com/ElisaMin/Khell.git"
+                            url = "https://github.com/ElisaMin/Khell"
                         }
                     }
                 }
