@@ -3,11 +3,10 @@ plugins {
     kotlin("multiplatform")
     `maven-publish`
 }
+android.namespace = "me.heizi.kotlinx.logger"
 kotlin {
     jvm()
-    android {
-        android.namespace = "me.heizi.kotlinx.logger"
-    }
+    android()
     sourceSets {
         commonTest {
             dependencies {

@@ -1,5 +1,3 @@
-import me.heizi.koltinx.version.versions
-
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
@@ -21,11 +19,9 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
-        val jvmTest by getting {
-            dependencies {
-                implementation(libs.slf4j.log4j12)
-                implementation(libs.kotlinx.coroutines.core.jvm)
-            }
+        findByName("jvmTest")?.dependencies {
+            implementation(libs.slf4j.log4j12)
+            implementation(libs.kotlinx.coroutines.core.jvm)
         }
         findByName("androidMain")?.run {
             dependencies {

@@ -12,8 +12,8 @@ testng = "6.9.6"
 [libraries]
 kotlinx-coroutines-core-common = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutine" }
 kotlinx-coroutines-core-jvm = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core-jvm", version.ref = "coroutine" }
-kotlinx-coroutines-debug = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-debug", version.ref = "coroutine" }
 kotlinx-coroutines-core-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutine" }
+kotlinx-coroutines-debug = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-debug", version.ref = "coroutine" }
 nuprocess = { group = "com.zaxxer", name = "nuprocess", version.ref = "nu-process" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 slf4j-log4j12 = { group = "org.slf4j", name = "slf4j-log4j12", version.ref = "slf4j" }

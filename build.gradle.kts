@@ -1,5 +1,4 @@
 import com.android.build.gradle.LibraryExtension
-import me.heizi.koltinx.version.props
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinAndroidTarget
 
@@ -71,6 +70,18 @@ fun Project.androidDefaultConfig() {
         if (!name.endsWith("-log"))
             namespace = "me.heizi.kotlinx.khell"
     }
+}
+interface Getter<T> {
+    operator fun get(key:String):T
+}
+val Project.props get() = object : Getter<java.util.Properties> {
+    override fun get(key: String): java.util.Properties = java.util.Properties().apply {
+        file("$key.properties").inputStream().use(::load)
+    }
+}
+
+operator fun <T> Property<T>.setValue (thisRef:Any?, prop: kotlin.reflect.KProperty<*>, value :T) {
+    set(value)
 }
 subprojects { when {
     rootProject.file("local.properties").exists() -> rootProject.props["local"]["maven_repo_dir"] as String?

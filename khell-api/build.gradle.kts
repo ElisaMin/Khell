@@ -1,5 +1,3 @@
-import me.heizi.koltinx.version.versions
-
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
