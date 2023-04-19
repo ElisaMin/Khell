@@ -3,22 +3,23 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinAndroidTarget
 import java.util.Properties
 
-@Suppress("DSL_SCOPE_VIOLATION")
-plugins {
+val plugin = plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.libAndroid) apply false
 }
-allprojects {
+val normalSettings = allprojects {
     group = "me.heizi.kotlinx"
     version = rootProject.libs.versions.khell.get()
     repositories {
-        mavenCentral()
+        mavenCentral {
+            url = uri("https://maven-central.storage-download.googleapis.com/maven2/")
+        }
         google()
     }
 }
 
-subprojects { afterEvaluate {
+val settings = subprojects { afterEvaluate {
     if (isMultiplatform)
         if(configKotlinMultiplatform())
             androidDefaultConfig()
@@ -48,7 +49,6 @@ fun Project.configKotlinMultiplatform():Boolean {
                 }
             }
         }
-        if (isAndroid) androidDefaultConfig()
     }
     return isAndroid
 }
@@ -76,7 +76,7 @@ fun Project.androidDefaultConfig() {
             namespace = "me.heizi.kotlinx.${name.replace("-",".")}"
     }
 }
-subprojects {
+val publishing = subprojects {
     apply(plugin = "maven-publish")
     configure<PublishingExtension> {
         publications {

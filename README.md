@@ -1,8 +1,8 @@
 # Kotlin Shell
-a simple and powerful command line executor with kotlin dsl, coroutine and multiplatform supported.
+a lib just package the process for unnecessary things etc. Async Flow and Coroutines.
+
 ## Help this project
-I'm not read the hold document of Coroutines and just wrote it, 
-so I think there's some misunderstandings on kotlin coroutine APIs, is that I overthink ? take a talk on Issues #2 maybe ? to...help this lib keep working?
+yes, it could be more powerful some how #2
 
 # QuickStart
 
