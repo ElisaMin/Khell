@@ -1,7 +1,7 @@
 import com.android.build.gradle.LibraryExtension
 import me.heizi.koltinx.version.props
-import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
-import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.targets
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinAndroidTarget
 
 apply("gradle/genLocal.gradle.kts")
 
@@ -19,52 +19,67 @@ allprojects {
         mavenCentral()
     }
 }
-
-subprojects {
-    val isAndroidProject = name!="khell-nu-process"
-    apply( plugin = "maven-publish")
-    apply( plugin =  "org.jetbrains.kotlin." +
-            if (isAndroidProject) "multiplatform" else  "jvm")
-    if (isAndroidProject) {
-        apply(plugin = "com.android.library")
-        extensions.getByType<LibraryExtension>().apply {
-            compileSdk = 33
-            @Suppress("DEPRECATION")
-            defaultConfig {
-                targetSdk = 33
-                testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-            }
-            compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_11
-                targetCompatibility = JavaVersion.VERSION_11
-            }
-            buildToolsVersion = "33.0.2"
-            // disable lint class version check
-            lint {
-                checkReleaseBuilds = false
-                abortOnError = false
-                baseline = file("build/lint-baseline.xml")
-            }
-            if (!name.endsWith("-log"))
-                namespace = "me.heizi.kotlinx.khell"
-
-        }
-    }
-    val local = when {
-        rootProject.file("local.properties").exists() -> rootProject.props["local"]["maven_repo_dir"] as String?
-        System.getenv("LOCAL_MAVEN_REPO_DIR") != null -> System.getenv("LOCAL_MAVEN_REPO_DIR")
-        else -> null
-    }
-    kotlinExtension.apply {
+subprojects { afterEvaluate {
+    if (isMultiplatform)
+        if(configKotlinMultiplatform())
+            androidDefaultConfig()
+} }
+fun Project.configKotlinMultiplatform():Boolean {
+    apply(plugin = "org.jetbrains.kotlin.multiplatform")
+    var isAndroid = false
+    configure<KotlinMultiplatformExtension> {
         jvmToolchain(19)
-        targets.forEach {
-            it.compilations.forEach {
-                it.kotlinOptions.freeCompilerArgs += "-Xcontext-receivers"
+        targets.all {
+            compilations.all {
+                kotlinOptions {
+                    freeCompilerArgs += "-Xcontext-receivers"
+                }
+            }
+            if (this is KotlinAndroidTarget) {
+                println("INFO: Android Project: ${project.name}")
+                isAndroid = true
+                compilations.all {
+                    kotlinOptions.jvmTarget = "11"
+                }
             }
         }
+        if (isAndroid) androidDefaultConfig()
     }
-    local?.let { configure<PublishingExtension> {
+    return isAndroid
+}
+fun Project.androidDefaultConfig() {
+    apply(plugin = "com.android.library")
+    configure<LibraryExtension> {
+        compileSdk = 33
+        @Suppress("DEPRECATION")
+        defaultConfig {
+            targetSdk = 33
+            testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        }
+        compileOptions {
+            sourceCompatibility = JavaVersion.VERSION_11
+            targetCompatibility = JavaVersion.VERSION_11
+        }
+        buildToolsVersion = "33.0.2"
+        // disable lint class version check
+        lint {
+            checkReleaseBuilds = false
+            abortOnError = false
+            baseline = file("lint-baseline.xml")
+        }
+        if (!name.endsWith("-log"))
+            namespace = "me.heizi.kotlinx.khell"
+    }
+}
+subprojects { when {
+    rootProject.file("local.properties").exists() -> rootProject.props["local"]["maven_repo_dir"] as String?
+    System.getenv("LOCAL_MAVEN_REPO_DIR") != null -> System.getenv("LOCAL_MAVEN_REPO_DIR")
+    else -> null
+}?.let {afterEvaluate {
+    apply(plugin = "org.jetbrains.kotlin.${ "multiplatform".takeIf { isMultiplatform } ?: "jvm" }")
+    apply(plugin = "maven-publish")
+    configure<PublishingExtension> {
         repositories {
             maven {
                 url = uri(it)
@@ -75,6 +90,6 @@ subprojects {
                 from(components["kotlin"])
             }
         }
-    } }
-
+    } } }
 }
+val Project.isMultiplatform get() = pluginManager.hasPlugin("org.jetbrains.kotlin.multiplatform")
