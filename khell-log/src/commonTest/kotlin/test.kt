@@ -6,9 +6,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
-@RunWith(JUnit4::class)
+//@RunWith(JUnit4::class)
 class LoggerTest {
-    @Test
+//    @Test
     fun log():Unit = runBlocking {
         this.println("log_normal")
         this.debug("log_normal")

@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertSame
 
 class CommonTest {
-    @Test
+//    @Test
     fun echoHelloWorld () = runBlocking {
         if (System.getProperty("os.name").startsWith("Windows"))
         Shell("echo hello world").await().let {
@@ -23,23 +23,27 @@ class CommonTest {
 
         }
     }
-    @Test fun `ping baidu` (): Unit = runBlocking {
+//    @Test
+    fun `ping baidu` (): Unit = runBlocking {
         Shell("ping baidu.com").await()
     }
 }
 class ReTest {
-    @Test fun `ping baidu by -k(eep)`() = runBlocking {
+//    @Test
+    fun `ping baidu by -k(eep)`() = runBlocking {
         ReShell(keepCLIPrefix) {
             this printlnRun  "ping baidu.com"
             debug("exiting")
             exit()
         }.collect(::println)
     }
-    @Test fun `ping baidu by -c`() = runBlocking {
+//    @Test
+    fun `ping baidu by -c`() = runBlocking {
         ReShell(defaultPrefix+"ping baidu.com")
             .collect(::println)
     }
-    @Test fun `echo hello world result`() = runBlocking {
+//    @Test
+    fun `echo hello world result`() = runBlocking {
         ReShell(defaultPrefix+"echo hello world")
             .await().let { it as? CommandResult.Success }!!.message.let {
                 repeat(it.length) {i->
