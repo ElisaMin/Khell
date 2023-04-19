@@ -8,7 +8,7 @@ slf4j = "2.0.7"
 android-junit = "1.1.5"
 khell = "0.0.1-alpha01"
 mockk = "1.13.4"
-testng = "6.9.6"
+testng = "7.7.1"
 
 [libraries]
 androidx-runner = { module = "androidx.test:runner", version.ref = "runner" }
