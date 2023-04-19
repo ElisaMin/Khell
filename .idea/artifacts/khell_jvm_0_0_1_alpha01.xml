@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="khell-jvm-0.0.1-alpha01">
+    <output-path>$PROJECT_DIR$/khell/build/libs</output-path>
+    <root id="archive" name="khell-jvm-0.0.1-alpha01.jar">
+      <element id="module-output" name="me.heizi.kotlinx.Khell.khell.jvmMain" />
+    </root>
+  </artifact>
+</component>

@@ -19,15 +19,16 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
-        findByName("jvmTest")?.dependencies {
+        getByName("jvmTest").dependencies {
             implementation(libs.slf4j.log4j12)
             implementation(libs.kotlinx.coroutines.core.jvm)
         }
-        findByName("androidMain")?.run {
-            dependencies {
-                implementation(libs.kotlinx.coroutines.core.android)
-
-            }
+        getByName("androidMain").dependencies {
+            implementation(libs.kotlinx.coroutines.core.android)
+        }
+        getByName("androidInstrumentedTest").dependencies {
+//            implementation(project(mapOf("path" to ":khell")))
+            implementation(libs.androidx.test.junit)
         }
     }
 }

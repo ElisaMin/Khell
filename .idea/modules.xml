@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell-nu-process/Khell.khell-nu-process.iml" filepath="$PROJECT_DIR$/.idea/modules/khell-nu-process/Khell.khell-nu-process.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell-nu-process/Khell.khell-nu-process.main.iml" filepath="$PROJECT_DIR$/.idea/modules/khell-nu-process/Khell.khell-nu-process.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell-nu-process/Khell.khell-nu-process.test.iml" filepath="$PROJECT_DIR$/.idea/modules/khell-nu-process/Khell.khell-nu-process.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.androidTest.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.androidTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.commonMain.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.commonMain.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.commonTest.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.commonTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.jvmMain.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.jvmMain.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/khell/Khell.khell.jvmTest.iml" filepath="$PROJECT_DIR$/.idea/modules/khell/Khell.khell.jvmTest.iml" />
+    </modules>
+  </component>
+</project>
