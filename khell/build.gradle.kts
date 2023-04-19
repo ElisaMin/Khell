@@ -9,7 +9,6 @@ kotlin {
     jvm()
     android()
     sourceSets {
-        val libs = rootProject.libs
         commonMain {
             dependencies {
                 api(project(":khell-log"))
@@ -34,12 +33,6 @@ kotlin {
 
             }
         }
-//        findByName("androidTest")?.run {
-//            dependencies {
-//                implementation(libs.androidx.test.ext.junit)
-//
-//            }
-//        }
     }
     targets.all {
         compilations.all {
