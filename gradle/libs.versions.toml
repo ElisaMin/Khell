@@ -1,13 +1,13 @@
 [versions]
 agp = "8.1.0-alpha11"
 kotlin = "1.8.20"
-nu-process="2.0.5"
+nu-process="2.0.6"
 coroutine="1.6.4"
 runner = "1.5.2"
 slf4j = "2.0.7"
 android-junit = "1.1.5"
 khell = "0.0.1-alpha01"
-mockk = "1.13.4"
+mockk = "1.13.5"
 testng = "7.7.1"
 
 [libraries]
