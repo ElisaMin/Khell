@@ -1,17 +1,24 @@
 import com.android.build.gradle.internal.scope.ProjectInfo.Companion.getBaseName
 import me.heizi.koltinx.version.*
+import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 apply("gradle/genLocal.gradle.kts")
 
 plugins {
-    kotlin("multiplatform") apply false
-    kotlin("jvm") apply false
-    id("com.android.library") apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.libAndroid) apply false
 }
 
-group = "me.heizi.kotlinx"
-version = versions["khell"]
+allprojects {
+    group = "me.heizi.kotlinx"
+    version = rootProject.libs.versions.khell.get()
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
 
 subprojects {
     apply( plugin = "maven-publish")
@@ -21,6 +28,9 @@ subprojects {
         rootProject.file("local.properties").exists() -> rootProject.props["local"]["maven_repo_dir"] as String?
         System.getenv("LOCAL_MAVEN_REPO_DIR") != null -> System.getenv("LOCAL_MAVEN_REPO_DIR")
         else -> null
+    }
+    kotlinExtension.apply {
+        jvmToolchain(19)
     }
     local?.let { configure<PublishingExtension> {
         repositories {
@@ -37,12 +47,4 @@ subprojects {
         }
     } }
 
-}
-
-
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
 }

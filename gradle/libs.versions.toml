@@ -1,0 +1,27 @@
+[versions]
+agp = "8.1.0-alpha11"
+kotlin = "1.8.20"
+nu-process="2.0.5"
+coroutine="1.6.4"
+slf4j = "2.0.7"
+android-junit = "1.1.5"
+khell = "0.0.1-alpha01"
+mockk = "1.13.4"
+testng = "6.9.6"
+
+[libraries]
+kotlinx-coroutines-core-common = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutine" }
+kotlinx-coroutines-core-jvm = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core-jvm", version.ref = "coroutine" }
+kotlinx-coroutines-debug = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-debug", version.ref = "coroutine" }
+kotlinx-coroutines-core-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutine" }
+nuprocess = { group = "com.zaxxer", name = "nuprocess", version.ref = "nu-process" }
+slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
+slf4j-log4j12 = { group = "org.slf4j", name = "slf4j-log4j12", version.ref = "slf4j" }
+androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "android-junit" }
+mockk = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
+testng = { module = "org.testng:testng", version.ref = "testng" }
+
+[plugins]
+libAndroid = { id = "com.android.library", version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

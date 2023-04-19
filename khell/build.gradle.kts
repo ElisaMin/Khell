@@ -1,5 +1,4 @@
 import me.heizi.koltinx.version.versions
-import org.jetbrains.kotlin.ir.backend.js.compile
 
 plugins {
     kotlin("multiplatform")
@@ -12,21 +11,12 @@ kotlin {
         publishLibraryVariants("release", "debug")
     }
     sourceSets {
+        val libs = rootProject.libs
         commonMain {
-            kotlin {
-                jvmToolchain(19)
-                targets.all {
-                    compilations.all {
-                        kotlinOptions {
-                            freeCompilerArgs += "-Xcontext-receivers"
-                        }
-                    }
-                }
-            }
             dependencies {
                 api(project(":khell-log"))
                 implementation(project(":khell-api"))
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:${versions["coroutine"]}")
+                api(libs.kotlinx.coroutines.core.common)
             }
         }
         commonTest {
@@ -36,21 +26,29 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:${versions["coroutine"]}")
-                implementation("org.slf4j:slf4j-log4j12:${versions["slf4j"]}")
+                implementation(libs.slf4j.log4j12)
+                implementation(libs.kotlinx.coroutines.core.jvm)
             }
         }
-        val androidMain by getting {
+        findByName("androidMain")?.run {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:${versions["coroutine"]}")
+                implementation(libs.kotlinx.coroutines.core.android)
+
             }
         }
-//        val androidTest by getting {
+//        findByName("androidTest")?.run {
 //            dependencies {
-//                implementation ("androidx.test.ext:junit:1.1.3")
+//                implementation(libs.androidx.test.ext.junit)
+//
 //            }
 //        }
-
+    }
+    targets.all {
+        compilations.all {
+            kotlinOptions {
+                freeCompilerArgs += "-Xcontext-receivers"
+            }
+        }
     }
 }
 
@@ -68,6 +66,11 @@ android {
         abortOnError = false
         baseline = file("build/lint-baseline.xml")
     }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    buildToolsVersion = "33.0.2"
 }
 
 
@@ -76,7 +79,7 @@ group = "me.heizi.kotlinx"
 version = versions["khell"]
 dependencies {
     api(project(":khell-log"))
-    androidTestImplementation("androidx.test.ext:junit:1.1.3")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }
 repositories {
     mavenCentral()
