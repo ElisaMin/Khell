@@ -9,3 +9,6 @@ actual val keepCLIPrefix: CommandPrefix
     = arrayOf("cmd","/k","echo off")
 actual val defaultCharset: Charset
     = charset("GBK")
+@Suppress("NOTHING_TO_INLINE")
+@ExperimentalApiReShell
+internal actual inline fun ReShell.id(): Number = process.pid()

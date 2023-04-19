@@ -8,6 +8,7 @@ import me.heizi.kotlinx.logger.error
 import me.heizi.kotlinx.shell.CommandResult.Companion.toResult
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.nio.charset.Charset
 import kotlin.coroutines.CoroutineContext
 import me.heizi.kotlinx.logger.debug as dddd
@@ -139,12 +140,12 @@ value class ReShell internal constructor(
 
 
 suspend fun Flow<Signal>.await():CommandResult =
-        toList().asSequence().toResult()
+    toList().asSequence().toResult()
 
 /**
  * package as KShell, [Deferred] async result type as [CommandResult], mixing [Flow] as [Signal] .
  *
- * preferred to use [Flow.await] instead
+ * preferred to use await instead @see Flow<Signal>.await
  */
 @ExperimentalApiReShell
 internal inline fun ReKShell(
@@ -228,15 +229,13 @@ internal suspend inline fun ReShell.running(
 ) = coroutineScope {
     debug("run", "ready")
     launch {
-        stdin?.let {
-            input(charset, it)
-        }
+        stdin?.let { input(charset, it) }
     }
     launch {
-        stdout(charset).collect { signals.emit(it) }
+        stdout(charset).collect { it:Signal -> signals.emit(it) }
     }
     if (!isRedirected) launch {
-        stderr(charset).collect { signals.emit(it) }
+        stderr(charset).collect { it:Signal -> signals.emit(it) }
     }
     debug("wait for", "ready")
     waitFor().collect { signals.emit(it) }
@@ -272,30 +271,40 @@ internal inline fun ReShell.waitFor() = flow {
 internal suspend inline fun ReShell.input(
     charset: Charset = defaultCharset,
     crossinline block: suspend WriteScope.() -> Unit
-) = process.outputWriter(charset).use { writer ->
-    debug("input","opened",writer)
+) = process.outputStream.use { it.writer(charset).use { writer ->
+    debug("input", "opened", writer)
     block(object : WriteScope {
         override fun write(string: String) {
-            debug("input", "command","writing",string.lines())
+            debug("input", "command", "writing", string.lines())
             writer.write(string)
             writer.flush()
         }
     })
-    debug("input","closing")
-}
+    debug("input", "closing")
+} }
 
+//internal expect inline fun Process.stdin(block: (Writer)->Unit)
+//internal expect inline fun Process.stderr(block: (String)->Unit)
+//internal expect inline fun Process.stderr(block: (String)->Unit)
+internal inline fun InputStream.useAsLinesFlow(charset: Charset) = flow {
+    use { stream ->
+        stream.bufferedReader(charset).useLines {
+            it.forEach { s -> emit(s) }
+        }
+    }
+}
 /**
  * collecting stderr
  *
  * covert as flow
  */
 @ExperimentalApiReShell
-fun ReShell.stderr(charset: Charset = defaultCharset) = flow {
+fun ReShell.stderr(charset: Charset = defaultCharset): Flow<Signal> {
     debug("stderr","ready")
-    process.errorReader(charset).useLines {
-        it.forEach { s -> emit(s) }
-    }
-}.map(Signal::Error)
+    return process.errorStream
+        .useAsLinesFlow(charset)
+        .map(Signal::Error)
+}
 
 /**
  * collecting stdout
@@ -303,20 +312,19 @@ fun ReShell.stderr(charset: Charset = defaultCharset) = flow {
  * covert as flow
  */
 @ExperimentalApiReShell
-fun ReShell.stdout(charset: Charset = defaultCharset) = flow {
+fun ReShell.stdout(charset: Charset = defaultCharset):Flow<Signal> {
     debug("stdout","ready")
-    process.inputReader(charset).useLines {
-        it.forEach { s -> emit(s) }
-    }
-}.map(Signal::Output)
+    return process.inputStream
+        .useAsLinesFlow(charset)
+        .map(Signal::Output)
+}
 
 /**
  * last message
  *
  * on error close before
  */
-@ExperimentalApiReShell
-suspend inline fun FlowCollector<Signal>.lastMsg (msg:String?,code:Int?){
+suspend fun FlowCollector<Signal>.lastMsg (msg:String?,code:Int?){
     msg?.let { s ->
         emit(Signal.Error(s))
     }
@@ -332,6 +340,7 @@ suspend inline fun FlowCollector<Signal>.lastMsg (msg:String?,code:Int?){
 suspend fun handlingProcessError(
     error: Throwable,lastMsg:suspend (String?,Int?)->Unit,
 ) = when {
+    error is CancellationException -> Unit
     error is IOException && error.message!=null -> {
         println("catch IO exception \n $error")
         val exceptionRegex = "Cannot run program \".+\": error=(\\d+), (.+)"
@@ -360,14 +369,14 @@ suspend fun handlingProcessError(
         lastMsg(msg,null)
     }
     else -> {
-        throw error
+//        throw error
         lastMsg(error.toString(),null)
     }
 }
 
 // log
 @ExperimentalApiReShell
-internal inline fun ReShell.id() = process.pid()
+internal expect inline fun ReShell.id():Number
 @ExperimentalApiReShell
 internal inline fun ReShell.debug(vararg any: Any?) = "KShell#${id()}".dddd(*any)
 @ExperimentalApiReShell
