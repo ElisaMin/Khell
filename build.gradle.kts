@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinAndroidTarget
 import java.util.Properties
 
-val plugin = plugins {
+plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.libAndroid) apply false
@@ -90,7 +90,7 @@ val publishing = subprojects {
                         url = uri(it)
                     }
                 }
-                maven {
+                if(!System.getenv("GITHUB_ACTOR").isNullOrEmpty() && !System.getenv("GITHUB_TOKEN").isNullOrEmpty()) maven {
                     name = "github"
                     url = uri("https://maven.pkg.github.com/ElisaMin/Khell")
                     credentials {
