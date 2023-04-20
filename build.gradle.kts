@@ -47,6 +47,7 @@ fun Project.configKotlinMultiplatform():Boolean {
                     implementation(libs.androidx.test.junit)
                     implementation(kotlin("test"))
                 }
+                publishLibraryVariants("release")
             }
         }
     }
