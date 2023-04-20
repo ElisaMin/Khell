@@ -32,7 +32,6 @@ jobs:
         env:
           GIT_TERMINAL_PROMPT: 0
         run: |
-          cd ./lib
           echo clone maven repo
           git clone https://${{ github.actor }}:${{secrets.MAVEN_REPO}}@github.com/ElisaMin/MavenTest.git build/maven-repo
           echo publish to maven repo
