@@ -13,7 +13,7 @@ dependencies {
 }
 
 kotlin {
-    jvmToolchain(19)
+    jvmToolchain(17)
     target.compilations.all {
         kotlinOptions {
             freeCompilerArgs += "-Xcontext-receivers"

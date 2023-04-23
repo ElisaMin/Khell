@@ -29,7 +29,7 @@ fun Project.configKotlinMultiplatform():Boolean {
     apply(plugin = "org.jetbrains.kotlin.multiplatform")
     var isAndroid = false
     configure<KotlinMultiplatformExtension> {
-        jvmToolchain(19)
+        jvmToolchain(17)
         targets.all {
             compilations.all {
                 kotlinOptions {
