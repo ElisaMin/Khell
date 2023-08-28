@@ -3,7 +3,7 @@
 khell = "0.0.1-alpha03"
 
 agp = "8.2.0-alpha07"
-kotlin = "1.8.22"
+kotlin = "1.9.10"
 nu-process="2.0.6"
 coroutine="1.6.4"
 runner = "1.5.2"
